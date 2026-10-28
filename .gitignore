@@ -1,36 +1,41 @@
-# Dependencies
-node_modules/
-.pnp
-.pnp.js
 
+!.env.example
+!.vscode/extensions.json
 # Build outputs
-dist/
-build/
-coverage/
-*.tsbuildinfo
-
+# Dependencies
+# Editor / OS
 # Environment variables
+# Local data
+# Logs
+# Prisma
+*.local
+*.log
+*.log
+*.tsbuildinfo
+.DS_Store
+.DS_Store
+.env
 .env
 .env.*
-!.env.example
-
-# Logs
+.env.local
+.idea/
+.pnp
+.pnp.js
+.vite/
+.vscode/*
+Thumbs.db
+build/
+build/
+coverage/
+dist/
+dist/
 logs/
-*.log
+node_modules/
+node_modules/
 npm-debug.log*
+pnpm-debug.log*
+prisma/dev.db
+server/.env
+server/prisma/*.db
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
-
-# Editor / OS
-.vscode/*
-!.vscode/extensions.json
-.idea/
-.DS_Store
-Thumbs.db
-
-# Prisma
-server/prisma/*.db
-
-# Local data
-*.local
