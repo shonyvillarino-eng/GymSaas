@@ -1,0 +1,606 @@
+// ============================================================================
+// GymFlow · Multi-Tenant Gym Management SaaS — Prisma Schema
+// ============================================================================
+//
+// Conventions:
+//   - Every tenant-scoped model carries a non-nullable `gymId`.
+//   - Monetary values are `Decimal` (never Float).
+//   - Soft deletes use `deletedAt`; financial/attendance history is never hard-deleted.
+//   - Enums are shared across models for consistent state modelling.
+//   - Referential actions protect historical records (PaymentRecord, Attendance).
+//
+// Multi-tenant security (ENFORCED AT QUERY TIME, not trust in client gymId):
+//   Every read/write MUST scope by gymId derived from the authenticated session
+//   (JWT payload), never from request body/query. The schema provides the
+//   `gymId` FK columns and composite unique indexes so scoped queries are
+//   efficient and unscoped writes are caught in review.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Enums ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  SUPER_ADMIN
+  GYM_ADMIN
+  INSTRUCTOR
+  MEMBER
+}
+
+enum MembershipStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  FROZEN
+  PENDING
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  PENDING
+  FROZEN
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+  PARTIAL
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  TRANSFER
+  BANK_TRANSFER
+  CHECK
+  OTHER
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  CANCELLED
+  EXCUSED
+}
+
+enum FitnessLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum DifficultyLevel {
+  EASY
+  MEDIUM
+  HARD
+  EXTREME
+}
+
+enum MuscleGroup {
+  CHEST
+  BACK
+  LEGS
+  SHOULDERS
+  ARMS
+  CORE
+  GLUTES
+  FULL_BODY
+  CARDIO
+  OTHER
+}
+
+enum ExerciseType {
+  STRENGTH
+  CARDIO
+  FLEXIBILITY
+  BALANCE
+  PLYOMETRICS
+  OTHER
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  RESTORE
+  LOGIN
+  LOGOUT
+  EXPORT
+  IMPORT
+  ASSIGN
+  UNASSIGN
+  PAYMENT_REGISTERED
+  ATTENDANCE_MARKED
+  ROUTINE_ASSIGNED
+}
+
+enum ProgressMetric {
+  WEIGHT
+  BODY_FAT
+  MUSCLE_MASS
+  CHEST
+  WAIST
+  HIPS
+  BICEPS
+  THIGH
+  HEIGHT
+  BMI
+  OTHER
+}
+
+// ── Core: Gym ────────────────────────────────────────────────────────────────
+
+model Gym {
+  id         String   @id @default(uuid())
+  name       String   @db.VarChar(120)
+  slug       String   @unique @db.VarChar(80)
+  legalName  String?  @db.VarChar(160)
+  taxId      String?  @db.VarChar(40)
+  email      String?  @db.VarChar(160)
+  phone      String?  @db.VarChar(40)
+  address    String?  @db.VarChar(240)
+  city       String?  @db.VarChar(80)
+  country    String?  @db.VarChar(80)
+  timezone   String   @default("UTC") @db.VarChar(64)
+  logoUrl    String?
+  isActive   Boolean  @default(true)
+  settings   Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  memberships        GymMembership[]
+  memberProfiles     MemberProfile[]
+  instructorProfiles InstructorProfile[]
+  instructorMembers  InstructorMember[]
+  plans              MembershipPlan[]
+  subscriptions      MemberSubscription[]
+  payments           PaymentRecord[]
+  attendances        Attendance[]
+  routines           Routine[]
+  routineDays        RoutineDay[]
+  routineExercises   RoutineExercise[]
+  exercises          Exercise[]
+  progressRecords    ProgressRecord[]
+  auditLogs          AuditLog[]
+
+  @@index([isActive])
+  @@index([createdAt])
+}
+
+// ── Core: User (credentials) ─────────────────────────────────────────────────
+// A User may exist without a GymMembership (e.g. SUPER_ADMIN platform-level).
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique @db.VarChar(160)
+  passwordHash  String    @db.VarChar(255)
+  fullName      String    @db.VarChar(120)
+  phone         String?   @db.VarChar(40)
+  avatarUrl     String?
+  role          UserRole  @default(MEMBER)
+  isActive      Boolean   @default(true)
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  memberships            GymMembership[]
+  memberProfile          MemberProfile?
+  instructorProfile      InstructorProfile?
+  registeredPayments     PaymentRecord[]      @relation("PaymentRegistrar")
+  recordedAttendances    Attendance[]           @relation("AttendanceRegistrar")
+  auditLogs              AuditLog[]
+  progressRecords        ProgressRecord[]
+  createdRoutines        Routine[]             @relation("RoutineCreator")
+  createdExercises       Exercise[]            @relation("ExerciseCreator")
+
+  @@index([role])
+  @@index([isActive])
+  @@index([createdAt])
+}
+
+// ── GymMembership: user ↔ gym with role ──────────────────────────────────────
+// One row per (gymId, userId). The `role` here overrides the User's default
+// `role` when the user belongs to multiple gyms.
+// The unique constraint on [gymId, userId] + partial unique index (via raw SQL)
+// enforces "exactly one active GYM_ADMIN per gym".
+
+model GymMembership {
+  id        String    @id @default(uuid())
+  gymId     String
+  userId    String
+  role      UserRole  @default(MEMBER)
+  isActive  Boolean   @default(true)
+  joinedAt  DateTime  @default(now())
+  leftAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  gym  Gym  @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([gymId, userId])
+  @@index([gymId, role])
+  @@index([gymId, isActive])
+  @@index([userId])
+}
+
+// ── MemberProfile: per-gym member details ────────────────────────────────────
+
+model MemberProfile {
+  id            String       @id @default(uuid())
+  gymId         String
+  userId        String       @unique
+  emergencyName String?      @db.VarChar(120)
+  emergencyPhone String?     @db.VarChar(40)
+  bloodType     String?      @db.VarChar(8)
+  healthNotes   String?
+  birthDate     DateTime?
+  gender        Gender?
+  heightCm      Decimal?     @db.Decimal(6, 2)
+  weightKg      Decimal?     @db.Decimal(6, 2)
+  goals         String[]
+  fitnessLevel  FitnessLevel @default(BEGINNER)
+  notes         String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  gym                 Gym                  @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  instructorMembers   InstructorMember[]
+  subscriptions       MemberSubscription[]
+  payments            PaymentRecord[]
+  attendances         Attendance[]
+  progressRecords     ProgressRecord[]
+  assignedRoutines    Routine[]
+
+  @@index([gymId])
+  @@index([userId])
+}
+
+// ── InstructorProfile: per-gym instructor details ────────────────────────────
+
+model InstructorProfile {
+  id              String   @id @default(uuid())
+  gymId           String
+  userId          String   @unique
+  specialization  String[] @default([])
+  certifications  String[] @default([])
+  bio             String?
+  hourlyRate      Decimal? @db.Decimal(8, 2)
+  maxMembers      Int      @default(0)
+  isAvailable     Boolean  @default(true)
+  startDate       DateTime @default(now())
+  endDate         DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  gym     Gym               @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  user    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  members InstructorMember[]
+
+  @@index([gymId])
+  @@index([gymId, isAvailable])
+  @@index([userId])
+}
+
+// ── InstructorMember: assignment of members to instructors ───────────────────
+// `isPrimary` distinguishes the main instructor from additional assignments.
+
+model InstructorMember {
+  id          String    @id @default(uuid())
+  gymId       String
+  instructorId String
+  memberId    String
+  isPrimary   Boolean   @default(false)
+  assignedAt  DateTime  @default(now())
+  assignedBy  String?
+  notes       String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  gym        Gym                @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  instructor InstructorProfile  @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+  member     MemberProfile      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([gymId, instructorId, memberId])
+  @@index([gymId])
+  @@index([instructorId, isActive])
+  @@index([memberId, isActive])
+}
+
+// ── MembershipPlan: plans offered by a gym ───────────────────────────────────
+
+model MembershipPlan {
+  id            String        @id @default(uuid())
+  gymId         String
+  name          String        @db.VarChar(120)
+  description   String?
+  price         Decimal       @db.Decimal(10, 2)
+  currency      String        @default("USD") @db.VarChar(3)
+  billingDays   Int           @default(30)
+  maxMembers    Int           @default(0)
+  features      String[]      @default([])
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  gym           Gym               @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  subscriptions MemberSubscription[]
+
+  @@unique([gymId, name])
+  @@index([gymId, isActive])
+  @@index([gymId])
+}
+
+// ── MemberSubscription: active subscription of a member to a plan ────────────
+
+model MemberSubscription {
+  id            String             @id @default(uuid())
+  gymId         String
+  memberId      String
+  planId        String
+  status        SubscriptionStatus @default(PENDING)
+  startDate     DateTime
+  endDate       DateTime
+  autoRenew     Boolean            @default(false)
+  priceAtPurchase Decimal           @db.Decimal(10, 2)
+  notes         String?
+  cancelledAt   DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  gym    Gym            @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  member MemberProfile  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  plan   MembershipPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  payments PaymentRecord[]
+
+  @@index([gymId, status])
+  @@index([gymId, memberId])
+  @@index([gymId, endDate])
+  @@index([memberId])
+  @@index([planId])
+}
+
+// ── PaymentRecord: manual payment history (never hard-deleted) ───────────────
+
+model PaymentRecord {
+  id            String        @id @default(uuid())
+  gymId         String
+  memberId      String?
+  subscriptionId String?
+  amount        Decimal       @db.Decimal(12, 2)
+  currency      String        @default("USD") @db.VarChar(3)
+  concept       String        @db.VarChar(200)
+  method        PaymentMethod @default(CASH)
+  status        PaymentStatus @default(COMPLETED)
+  paidAt        DateTime      @default(now())
+  reference     String?       @db.VarChar(120)
+  notes         String?
+  recordedById  String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  deletedAt     DateTime?
+
+  gym          Gym                  @relation(fields: [gymId], references: [id], onDelete: Restrict)
+  member       MemberProfile?       @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  subscription MemberSubscription?  @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  recordedBy   User?                @relation("PaymentRegistrar", fields: [recordedById], references: [id], onDelete: SetNull)
+
+  @@index([gymId, paidAt])
+  @@index([gymId, status])
+  @@index([gymId, memberId])
+  @@index([recordedById])
+  @@index([subscriptionId])
+}
+
+// ── Attendance: historical check-in records (never hard-deleted) ─────────────
+
+model Attendance {
+  id          String           @id @default(uuid())
+  gymId       String
+  memberId    String
+  checkInTime DateTime         @default(now())
+  checkOutTime DateTime?
+  status      AttendanceStatus @default(PRESENT)
+  method      String           @default("MANUAL") @db.VarChar(40)
+  notes       String?
+  recordedById String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  deletedAt   DateTime?
+
+  gym        Gym              @relation(fields: [gymId], references: [id], onDelete: Restrict)
+  member     MemberProfile    @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  recordedBy User?            @relation("AttendanceRegistrar", fields: [recordedById], references: [id], onDelete: SetNull)
+
+  @@unique([gymId, memberId, checkInTime])
+  @@index([gymId, checkInTime])
+  @@index([gymId, memberId])
+  @@index([memberId])
+  @@index([recordedById])
+}
+
+// ── Routine: training routines ───────────────────────────────────────────────
+
+model Routine {
+  id            String        @id @default(uuid())
+  gymId         String
+  name          String        @db.VarChar(140)
+  description   String?
+  difficulty    DifficultyLevel @default(MEDIUM)
+  estimatedWeeks Int          @default(4)
+  createdBy     String?
+  assignedToId  String?
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  deletedAt     DateTime?
+
+  gym       Gym                   @relation(fields: [gymId], references: [id], onDelete: Restrict)
+  creator   User?                 @relation("RoutineCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  assignee  MemberProfile?         @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  days      RoutineDay[]
+
+  @@index([gymId, isActive])
+  @@index([gymId, assignedToId])
+  @@index([gymId, deletedAt])
+  @@index([createdBy])
+}
+
+// ── RoutineDay: one training session within a routine ────────────────────────
+
+model RoutineDay {
+  id          String   @id @default(uuid())
+  gymId       String
+  routineId   String
+  name        String   @db.VarChar(140)
+  dayOrder    Int      @default(0)
+  description String?
+  restDay     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  gym        Gym               @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  routine    Routine           @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  exercises  RoutineExercise[]
+
+  @@unique([routineId, dayOrder])
+  @@index([gymId])
+  @@index([routineId])
+}
+
+// ── Exercise: gym-wide exercise catalog ──────────────────────────────────────
+
+model Exercise {
+  id           String        @id @default(uuid())
+  gymId        String
+  name         String        @db.VarChar(140)
+  description  String?
+  muscleGroup  MuscleGroup   @default(OTHER)
+  exerciseType ExerciseType  @default(STRENGTH)
+  equipment    String[]      @default([])
+  videoUrl     String?
+  imageUrl     String?
+  instructions String?
+  tips         String?
+  isPublic     Boolean       @default(false)
+  createdBy    String?
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  gym     Gym               @relation(fields: [gymId], references: [id], onDelete: Restrict)
+  creator User?             @relation("ExerciseCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  usages  RoutineExercise[]
+
+  @@unique([gymId, name])
+  @@index([gymId, muscleGroup])
+  @@index([gymId, isActive])
+  @@index([gymId, exerciseType])
+  @@index([gymId, isPublic])
+}
+
+// ── RoutineExercise: link between RoutineDay and Exercise ────────────────────
+
+model RoutineExercise {
+  id           String   @id @default(uuid())
+  gymId        String
+  routineDayId String
+  exerciseId   String
+  exerciseOrder Int     @default(0)
+  sets         Int      @default(3)
+  reps         String   @default("10") @db.VarChar(50)
+  restSeconds  Int      @default(60)
+  weightKg     Decimal? @db.Decimal(6, 2)
+  durationSec  Int?
+  targetRPE    Decimal? @db.Decimal(4, 2)
+  instructions String?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  gym        Gym         @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  routineDay RoutineDay  @relation(fields: [routineDayId], references: [id], onDelete: Cascade)
+  exercise   Exercise    @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+
+  @@unique([routineDayId, exerciseId, exerciseOrder])
+  @@index([gymId])
+  @@index([routineDayId])
+  @@index([exerciseId])
+  @@index([gymId, routineDayId])
+}
+
+// ── ProgressRecord: physical evaluations over time ───────────────────────────
+
+model ProgressRecord {
+  id          String         @id @default(uuid())
+  gymId       String
+  memberId    String
+  recordedById String?
+  metric      ProgressMetric
+  value       Decimal        @db.Decimal(8, 2)
+  unit        String         @default("kg") @db.VarChar(20)
+  bodyFatPct  Decimal?       @db.Decimal(5, 2)
+  notes       String?
+  measuredAt  DateTime       @default(now())
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  gym        Gym          @relation(fields: [gymId], references: [id], onDelete: Restrict)
+  member     MemberProfile @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  recordedBy User?        @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+
+  @@index([gymId, memberId])
+  @@index([gymId, metric])
+  @@index([gymId, measuredAt])
+  @@index([memberId])
+  @@index([recordedById])
+}
+
+// ── AuditLog: important operations ────────────────────────────────────────────
+
+model AuditLog {
+  id         String      @id @default(uuid())
+  gymId      String
+  userId     String?
+  action     AuditAction
+  entityType String      @db.VarChar(80)
+  entityId   String?
+  oldValues  Json?
+  newValues  Json?
+  ipAddress  String?     @db.VarChar(45)
+  userAgent  String?     @db.VarChar(400)
+  createdAt  DateTime    @default(now())
+
+  gym  Gym   @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([gymId, createdAt])
+  @@index([gymId, entityType])
+  @@index([gymId, action])
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
