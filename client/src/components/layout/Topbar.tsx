@@ -1,7 +1,9 @@
 import { Bell, Menu, Moon, Sun, Monitor } from 'lucide-react';
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 
 import type { Theme } from '../../lib/theme';
+import { useAuth } from '../../lib/auth';
 
 interface TopbarProps {
   theme: Theme;
@@ -11,6 +13,9 @@ interface TopbarProps {
 
 export function Topbar({ theme, onToggleTheme, onToggleSidebar }: TopbarProps) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const { user } = useAuth();
+  const location = useLocation();
+  const pageTitle = location.pathname.startsWith('/admin/gyms/') ? 'Gym details' : location.pathname === '/admin/gyms' ? 'Gyms' : location.pathname === '/admin' ? 'Platform overview' : location.pathname.startsWith('/gym/members') ? 'Members' : location.pathname.startsWith('/gym/instructors') ? 'Instructors' : location.pathname.startsWith('/gym/plans') ? 'Membership plans' : location.pathname.startsWith('/gym/subscriptions') ? 'Memberships' : location.pathname === '/gym/settings' ? 'Gym settings' : location.pathname === '/instructor/members' ? 'My members' : location.pathname === '/instructor/routines' ? 'Routines' : location.pathname === '/instructor/profile' ? 'My profile' : user?.role === 'INSTRUCTOR' ? 'Instructor dashboard' : user?.role === 'GYM_ADMIN' ? 'Gym dashboard' : 'Dashboard';
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/80 px-4 backdrop-blur-md sm:px-6">
@@ -23,9 +28,9 @@ export function Topbar({ theme, onToggleTheme, onToggleSidebar }: TopbarProps) {
           <Menu className="h-5 w-5" />
         </button>
         <div>
-          <h1 className="text-lg font-semibold leading-tight">Dashboard</h1>
+          <h1 className="text-lg font-semibold leading-tight">{pageTitle}</h1>
           <p className="hidden text-xs text-muted-foreground sm:block">
-            Welcome back, Admin
+            Welcome back, {user?.fullName.split(' ')[0] ?? 'there'}
           </p>
         </div>
       </div>

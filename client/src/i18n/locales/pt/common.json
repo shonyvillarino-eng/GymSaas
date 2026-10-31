@@ -1,0 +1,63 @@
+{
+  "app": {
+    "name": "GymFlow",
+    "loading": "Carregando...",
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "edit": "Editar",
+    "delete": "Excluir",
+    "search": "Pesquisar",
+    "filter": "Filtrar",
+    "reset": "Redefinir",
+    "refresh": "Atualizar",
+    "back": "Voltar",
+    "next": "Próximo",
+    "previous": "Anterior",
+    "yes": "Sim",
+    "no": "Não",
+    "error": "Erro",
+    "success": "Sucesso",
+    "noData": "Sem dados"
+  },
+  "nav": {
+    "dashboard": "Painel",
+    "members": "Alunos",
+    "instructors": "Instrutores",
+    "plans": "Planos",
+    "subscriptions": "Matrículas",
+    "payments": "Pagamentos",
+    "receivables": "Recebíveis",
+    "cash": "Caixa",
+    "attendance": "Presenças",
+    "exercises": "Exercícios",
+    "routines": "Treinos",
+    "reports": "Relatórios",
+    "settings": "Configurações",
+    "profile": "Perfil",
+    "logout": "Sair"
+  },
+  "auth": {
+    "login": "Entrar",
+    "email": "E-mail",
+    "password": "Senha",
+    "signIn": "Entrar"
+  },
+  "settings": {
+    "title": "Configurações da Academia",
+    "sections": {
+      "business": "Informações da Academia",
+      "localization": "Idioma e Região",
+      "hours": "Horários",
+      "operations": "Configurações Operacionais",
+      "appearance": "Aparência",
+      "profile": "Preferências Pessoais"
+    },
+    "language": "Idioma",
+    "defaultLanguage": "Idioma padrão da academia",
+    "personalLanguage": "Idioma pessoal",
+    "timezone": "Fuso horário",
+    "country": "País",
+    "currency": "Moeda"
+  }
+}

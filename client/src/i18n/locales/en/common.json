@@ -1,0 +1,63 @@
+{
+  "app": {
+    "name": "GymFlow",
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "edit": "Edit",
+    "delete": "Delete",
+    "search": "Search",
+    "filter": "Filter",
+    "reset": "Reset",
+    "refresh": "Refresh",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "yes": "Yes",
+    "no": "No",
+    "error": "Error",
+    "success": "Success",
+    "noData": "No data"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "members": "Members",
+    "instructors": "Instructors",
+    "plans": "Plans",
+    "subscriptions": "Subscriptions",
+    "payments": "Payments",
+    "receivables": "Receivables",
+    "cash": "Cash",
+    "attendance": "Attendance",
+    "exercises": "Exercises",
+    "routines": "Routines",
+    "reports": "Reports",
+    "settings": "Settings",
+    "profile": "Profile",
+    "logout": "Logout"
+  },
+  "auth": {
+    "login": "Login",
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Sign in"
+  },
+  "settings": {
+    "title": "Gym Settings",
+    "sections": {
+      "business": "Business Information",
+      "localization": "Language & Region",
+      "hours": "Business Hours",
+      "operations": "Operational Settings",
+      "appearance": "Appearance",
+      "profile": "Personal Preferences"
+    },
+    "language": "Language",
+    "defaultLanguage": "Default gym language",
+    "personalLanguage": "Personal language",
+    "timezone": "Timezone",
+    "country": "Country",
+    "currency": "Currency"
+  }
+}

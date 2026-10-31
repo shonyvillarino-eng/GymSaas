@@ -2,7 +2,7 @@ import { forwardRef, useId } from 'react';
 
 import { cn } from '../../lib/utils';
 
-type InputType = 'text' | 'email' | 'password' | 'number' | 'date' | 'tel';
+type InputType = 'text' | 'email' | 'password' | 'number' | 'date' | 'time' | 'tel';
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;

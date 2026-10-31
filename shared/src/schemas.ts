@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { USER_ROLES } from './enums';
+import { USER_ROLES } from './enums.js';
 
 export const emailSchema = z.string().trim().toLowerCase().email('Invalid email address');
 

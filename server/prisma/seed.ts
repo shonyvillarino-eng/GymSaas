@@ -15,6 +15,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import { hashPassword } from '../src/lib/password.js';
 
 const prisma = new PrismaClient();
 
@@ -49,6 +50,7 @@ const USERS = {
 };
 
 async function main() {
+  const DEV_PASSWORD_HASH = await hashPassword('DevPass!2026');
   console.log('🌱 Seeding development data...');
 
   // 1. Gym
@@ -79,7 +81,7 @@ async function main() {
         email: u.email,
         fullName: u.fullName,
         role: u.role,
-        passwordHash: 'dev-only-not-a-real-hash',
+        passwordHash: DEV_PASSWORD_HASH,
         isActive: true,
       },
     });
@@ -156,6 +158,7 @@ async function main() {
   });
   console.log('  ✓ MembershipPlan: Basic ($29.99/30d)');
 
+  console.log('  ✓ Development accounts seeded (see README for sign-in details)');
   console.log('✅ Seed complete.');
 }
 

@@ -1,6 +1,14 @@
 import dotenv from 'dotenv';
 import { z } from 'zod';
 
+// The hosting runner injects PORT=0 as a "pick any port" placeholder. Our
+// services run behind a fixed port (Vite proxies /api to :4000), so discard
+// that placeholder before loading the project .env. Real, non-zero PORT
+// values from the environment are still respected.
+if (process.env.PORT === '0') {
+  delete process.env.PORT;
+}
+
 dotenv.config();
 
 const envSchema = z.object({
@@ -15,6 +23,12 @@ const envSchema = z.object({
     .union([z.literal('true'), z.literal('false')])
     .default('false')
     .transform((v) => v === 'true'),
+  S3_ENDPOINT: z.string().url().optional(),
+  S3_REGION: z.string().default('auto'),
+  S3_BUCKET: z.string().optional(),
+  S3_ACCESS_KEY_ID: z.string().optional(),
+  S3_SECRET_ACCESS_KEY: z.string().optional(),
+  S3_PUBLIC_BASE_URL: z.string().url().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

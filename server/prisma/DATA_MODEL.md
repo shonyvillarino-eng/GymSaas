@@ -15,11 +15,12 @@
 | 7 | **MembershipPlan** | Pricing plan | *(gymId,name)* unique, `price` Decimal |
 | 8 | **MemberSubscription** | Plan subscription | `status` enum, `startDate`,`endDate` |
 | 9 | **PaymentRecord** | Manual payment history | `amount` Decimal(12,2), `method`,`status` enums, soft-delete |
-| 10 | **Attendance** | Check-in history | *(gymId,memberId,checkInTime)* unique, soft-delete |
-| 11 | **Routine** | Training routine | `difficulty` enum, soft-delete |
-| 12 | **RoutineDay** | Session/day in a routine | *(routineId,dayOrder)* unique |
-| 13 | **Exercise** | Exercise catalog | *(gymId,name)* unique, `isPublic` flag |
-| 14 | **RoutineExercise** | Day ↔ exercise link | *(routineDayId,exerciseId,exerciseOrder)* unique, `sets`,`reps`,`restSeconds` |
+| 10 | **Attendance** | Check-in history | *(gymId,memberId,checkInTime)* unique, soft-delete, `method`/`result` enums |
+| 11 | **Routine** | Training routine | `status` (`DRAFT`/`ACTIVE`/`ARCHIVED`), `version`, `instructorId`, `isActive` kept in sync, soft-delete |
+| 12 | **RoutineDay** | Session/day in a routine | *(routineId,dayOrder)* unique, `restDay` flag |
+| 13 | **Exercise** | Exercise catalog | *(gymId,name)* unique, `equipment[]`, `isActive`, `isPublic` flag |
+| 14 | **RoutineExercise** | Day ↔ exercise link | *(routineDayId,exerciseId,exerciseOrder)* unique, `sets`,`reps`,`restSeconds`,`weightKg`,`tempo` |
+| 14b | **RoutineVersion** | Immutable routine snapshot per accepted change | *(routineId,version)* unique, `snapshot` JSON, `reason` |
 | 15 | **ProgressRecord** | Physical evaluations | `metric` enum, `value` Decimal, measuredAt |
 | 16 | **AuditLog** | Operation audit trail | Append-only, `action`,`entityType` enums |
 
@@ -34,6 +35,9 @@
 | `PaymentStatus` | PENDING, COMPLETED, FAILED, REFUNDED, PARTIAL |
 | `PaymentMethod` | CASH, CARD, TRANSFER, BANK_TRANSFER, CHECK, OTHER |
 | `AttendanceStatus` | PRESENT, ABSENT, LATE, CANCELLED, EXCUSED |
+| `RoutineStatus` | DRAFT, ACTIVE, ARCHIVED |
+| `AttendanceMethod` | MANUAL, QR |
+| `AttendanceResult` | ALLOWED, EXCEPTION |
 | `FitnessLevel` | BEGINNER, INTERMEDIATE, ADVANCED |
 | `DifficultyLevel` | EASY, MEDIUM, HARD, EXTREME |
 | `MuscleGroup` | CHEST, BACK, LEGS, SHOULDERS, ARMS, CORE, GLUTES, FULL_BODY, CARDIO, OTHER |
@@ -109,6 +113,8 @@ CREATE UNIQUE INDEX "GymMembership_one_active_admin_per_gym"
 - `MembershipPlan(gymId, name)` — no duplicate plan names per gym
 - `Exercise(gymId, name)` — no duplicate exercise names per gym
 - `Attendance(gymId, memberId, checkInTime)` — no duplicate check-ins
+- `MemberProfile.qrToken` — unique check-in credential; `NULL` once revoked, so an old printed code stops resolving
+- `Attendance` duplicate prevention on the *sliding window* is not expressible as a constraint: it is enforced by `pg_advisory_xact_lock(gymId:memberId)` inside the insert transaction, with the unique index as the final backstop
 - `RoutineDay(routineId, dayOrder)` — unique order per routine
 - `RoutineExercise(routineDayId, exerciseId, exerciseOrder)` — unique exercise slot
 
@@ -120,6 +126,9 @@ CREATE UNIQUE INDEX "GymMembership_one_active_admin_per_gym"
 - `amount` uses `Decimal(12,2)` — never `Float`.
 - DELETE operations on `Gym` **RESTRICT**ed if payments/attendance exist.
 - All `_at` timestamps are `DateTime @default(now())`.
+- **Routine → RoutineDay → RoutineExercise** are hard rows, never updated in place without a version: each accepted change increments `Routine.version` and appends a `RoutineVersion` row whose `snapshot` JSON holds the whole prescription, so the previous configuration stays queryable.
+- Activating a routine archives (never deletes) the member's previous active one in the same transaction; a partial unique index on `(assignedToId)` where `status = 'ACTIVE'` keeps one active routine per member even under concurrent requests.
+- Archiving sets `status = ARCHIVED`, `archivedAt` and `isActive = false`; the author (`createdBy`) and responsible instructor are never rewritten by administrative edits.
 
 ---
 
@@ -147,9 +156,10 @@ Gym ──┬─< GymMembership >── User
       │         └─< PaymentRecord >── User (registrar)
       ├─< InstructorMember (InstructorProfile ↔ MemberProfile)
       ├─< Attendance >── MemberProfile
-      ├─< Routine >── User (creator), MemberProfile (assignee)
-      │    └─< RoutineDay
-      │         └─< RoutineExercise >── Exercise
+      ├─< Routine >── User (creator), MemberProfile (assignee), InstructorProfile (responsible)
+      │    ├─< RoutineDay
+      │    │    └─< RoutineExercise >── Exercise
+      │    └─< RoutineVersion (immutable snapshot, reason CREATE/UPDATE/ACTIVATE/ARCHIVE/SUPERSEDED)
       ├─< Exercise >── User (creator)
       ├─< ProgressRecord >── MemberProfile, User (recordedBy)
       └─< AuditLog >── User

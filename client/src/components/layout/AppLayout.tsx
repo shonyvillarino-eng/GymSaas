@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
+
+import { LoadingState } from '../ui/states';
 
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
@@ -29,7 +31,10 @@ export function AppLayout() {
         />
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8">
-          <Outlet />
+          {/* Keeps the shell visible while a lazy route chunk is downloading. */}
+          <Suspense fallback={<LoadingState label="Loading…" />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

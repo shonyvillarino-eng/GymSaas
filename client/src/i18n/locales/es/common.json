@@ -1,0 +1,63 @@
+{
+  "app": {
+    "name": "GymFlow",
+    "loading": "Cargando...",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "search": "Buscar",
+    "filter": "Filtrar",
+    "reset": "Restablecer",
+    "refresh": "Actualizar",
+    "back": "Volver",
+    "next": "Siguiente",
+    "previous": "Anterior",
+    "yes": "Sí",
+    "no": "No",
+    "error": "Error",
+    "success": "Éxito",
+    "noData": "Sin datos"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "members": "Socios",
+    "instructors": "Instructores",
+    "plans": "Planes",
+    "subscriptions": "Membresías",
+    "payments": "Pagos",
+    "receivables": "Cuentas por cobrar",
+    "cash": "Caja",
+    "attendance": "Asistencia",
+    "exercises": "Ejercicios",
+    "routines": "Rutinas",
+    "reports": "Reportes",
+    "settings": "Configuración",
+    "profile": "Perfil",
+    "logout": "Cerrar sesión"
+  },
+  "auth": {
+    "login": "Iniciar sesión",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "signIn": "Ingresar"
+  },
+  "settings": {
+    "title": "Configuración del gimnasio",
+    "sections": {
+      "business": "Información del gimnasio",
+      "localization": "Idioma y región",
+      "hours": "Horarios",
+      "operations": "Configuración operativa",
+      "appearance": "Personalización visual",
+      "profile": "Preferencias personales"
+    },
+    "language": "Idioma",
+    "defaultLanguage": "Idioma predeterminado del gimnasio",
+    "personalLanguage": "Idioma personal",
+    "timezone": "Zona horaria",
+    "country": "País",
+    "currency": "Moneda"
+  }
+}

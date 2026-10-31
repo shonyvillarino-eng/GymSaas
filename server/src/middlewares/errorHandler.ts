@@ -17,7 +17,7 @@ export class AppError extends Error {
 
 export const errorHandler: ErrorRequestHandler = (
   err: unknown,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction
 ) => {
@@ -40,6 +40,21 @@ export const errorHandler: ErrorRequestHandler = (
   if (!isProd) {
     // eslint-disable-next-line no-console
     console.error(err);
+  } else if (status >= 500) {
+    // Production: record the failure without the stack or request body, so an
+    // operator can correlate it with the response's X-Request-Id header.
+    // eslint-disable-next-line no-console
+    console.error(
+      JSON.stringify({
+        level: 'error',
+        event: 'unhandled_error',
+        request_id: (req as Request & { requestId?: string }).requestId ?? null,
+        method: req.method,
+        path: req.originalUrl.split('?')[0],
+        status,
+        name: err instanceof Error ? err.name : 'Unknown',
+      })
+    );
   }
 
   res.status(status).json({
