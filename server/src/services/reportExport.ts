@@ -1,0 +1,237 @@
+import ExcelJS from 'exceljs';
+import PDFDocument from 'pdfkit';
+
+export interface ReportColumn {
+  key: string;
+  label: string;
+  width?: number;
+  align?: 'left' | 'right';
+}
+
+export interface ReportDocument {
+  gymName: string;
+  title: string;
+  periodLabel: string;
+  generatedAt: Date;
+  filters: Array<[string, string]>;
+  columns: ReportColumn[];
+  rows: Array<Record<string, unknown>>;
+  totals: Array<[string, string]>;
+  locale: string;
+  timezone: string;
+}
+
+const PAGE_WIDTH = 842; // A4 landscape
+const PAGE_HEIGHT = 595;
+const MARGIN = 36;
+const ROW_HEIGHT = 18;
+const HEADER_HEIGHT = 22;
+
+function truncateToWidth(doc: PDFKit.PDFDocument, text: string, width: number) {
+  if (doc.widthOfString(text) <= width) return text;
+  let cut = text;
+  while (cut.length > 1 && doc.widthOfString(`${cut}…`) > width) cut = cut.slice(0, -1);
+  return `${cut}…`;
+}
+
+function cellText(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (value instanceof Date) return value.toISOString().slice(0, 16).replace('T', ' ');
+  return String(value);
+}
+
+/**
+ * PDF report with the gym identity, report title, period, generation date,
+ * applied filters, table data and totals. Generates no writes.
+ */
+export function buildReportPdf(report: ReportDocument): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: MARGIN, compress: false });
+    const chunks: Buffer[] = [];
+    doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+
+    const usable = PAGE_WIDTH - MARGIN * 2;
+    const totalWidth = report.columns.reduce((sum, column) => sum + (column.width ?? 120), 0);
+    const widths = report.columns.map((column) => Math.floor(((column.width ?? 120) / totalWidth) * usable));
+
+    const drawHeader = (firstPage: boolean) => {
+      if (firstPage) {
+        doc.font('Helvetica-Bold').fontSize(16).fillColor('#111111').text(report.gymName, MARGIN, MARGIN);
+        doc.font('Helvetica-Bold').fontSize(13).fillColor('#111111').text(report.title, MARGIN, MARGIN + 24);
+        doc
+          .font('Helvetica')
+          .fontSize(9)
+          .fillColor('#555555')
+          .text(`${report.periodLabel} · Generated ${report.generatedAt.toISOString().slice(0, 16).replace('T', ' ')} UTC`, MARGIN, MARGIN + 44);
+        if (report.filters.length > 0) {
+          doc.text(
+            `Filters: ${report.filters.map(([key, value]) => `${key}: ${value}`).join(' · ')}`,
+            MARGIN,
+            MARGIN + 58,
+            { width: usable },
+          );
+        }
+      }
+      const headerY = MARGIN + 80;
+      let x = MARGIN;
+      doc.rect(MARGIN, headerY, usable, HEADER_HEIGHT).fill('#f1f5f9');
+      doc.fillColor('#111111').font('Helvetica-Bold').fontSize(8);
+      report.columns.forEach((column, index) => {
+        const width = widths[index] ?? 0;
+        doc.text(truncateToWidth(doc, column.label, width - 6), x + 3, headerY + 7, {
+          width: width - 6,
+          align: column.align ?? 'left',
+          lineBreak: false,
+        });
+        x += width;
+      });
+      return headerY + HEADER_HEIGHT;
+    };
+
+    let y = drawHeader(true);
+    doc.font('Helvetica').fontSize(8);
+
+    for (const row of report.rows) {
+      if (y + ROW_HEIGHT > PAGE_HEIGHT - MARGIN - 70) {
+        doc.addPage({ size: 'A4', layout: 'landscape', margin: MARGIN });
+        y = drawHeader(false);
+        doc.font('Helvetica').fontSize(8);
+      }
+      let x = MARGIN;
+      report.columns.forEach((column, index) => {
+        const width = widths[index] ?? 0;
+        const text = truncateToWidth(doc, cellText(row[column.key]), width - 6);
+        doc.fillColor('#1f2937').text(text, x + 3, y + 5, {
+          width: width - 6,
+          align: column.align ?? 'left',
+          lineBreak: false,
+        });
+        x += width;
+      });
+      doc.moveTo(MARGIN, y + ROW_HEIGHT).lineTo(MARGIN + usable, y + ROW_HEIGHT).strokeColor('#e5e7eb').stroke();
+      y += ROW_HEIGHT;
+    }
+
+    if (report.rows.length === 0) {
+      doc.fillColor('#6b7280').text('No records match the selected filters.', MARGIN, y + 10, { width: usable });
+      y += 28;
+    }
+
+    if (y > PAGE_HEIGHT - MARGIN - 80) {
+      doc.addPage({ size: 'A4', layout: 'landscape', margin: MARGIN });
+      y = MARGIN;
+    }
+
+    y += 16;
+    doc.font('Helvetica-Bold').fontSize(9).fillColor('#111111').text('Totals', MARGIN, y);
+    y += 14;
+    doc.font('Helvetica').fontSize(8);
+    for (const [label, value] of report.totals) {
+      doc.fillColor('#555555').text(`${label}:`, MARGIN, y);
+      doc.fillColor('#111111').text(value, MARGIN + 140, y, { width: usable - 140 });
+      y += 13;
+    }
+
+    const footerY = PAGE_HEIGHT - MARGIN + 8;
+    doc
+      .font('Helvetica')
+      .fontSize(7)
+      .fillColor('#777777')
+      .text(
+        'Internal administrative report generated by the gym management system. It is not a fiscal invoice.',
+        MARGIN,
+        footerY,
+        { width: usable, lineBreak: false },
+      );
+
+    doc.end();
+  });
+}
+
+/** XLSX report with the same metadata, data and totals as the PDF. */
+export async function buildReportXlsx(report: ReportDocument): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = report.gymName;
+  workbook.created = report.generatedAt;
+  const sheet = workbook.addWorksheet('Report', {
+    pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
+  });
+
+  const lastColumn = Math.max(1, report.columns.length);
+  sheet.getColumn(1).width = 22;
+
+  sheet.mergeCells(1, 1, 1, lastColumn);
+  sheet.getCell(1, 1).value = report.gymName;
+  sheet.getCell(1, 1).font = { bold: true, size: 16 };
+
+  sheet.mergeCells(2, 1, 2, lastColumn);
+  sheet.getCell(2, 1).value = report.title;
+  sheet.getCell(2, 1).font = { bold: true, size: 13 };
+
+  sheet.mergeCells(3, 1, 3, lastColumn);
+  sheet.getCell(3, 1).value = report.periodLabel;
+
+  sheet.mergeCells(4, 1, 4, lastColumn);
+  sheet.getCell(4, 1).value = `Generated: ${report.generatedAt.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+
+  sheet.mergeCells(5, 1, 5, lastColumn);
+  sheet.getCell(5, 1).value = report.filters.length > 0
+    ? `Filters: ${report.filters.map(([key, value]) => `${key}: ${value}`).join(' · ')}`
+    : 'Filters: none';
+
+  for (const cell of [sheet.getCell(3, 1), sheet.getCell(4, 1), sheet.getCell(5, 1)]) {
+    cell.font = { size: 9, color: { argb: 'FF555555' } };
+  }
+
+  const headerRow = sheet.getRow(7);
+  report.columns.forEach((column, index) => {
+    const cell = headerRow.getCell(index + 1);
+    cell.value = column.label;
+    cell.font = { bold: true, size: 9 };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+    cell.alignment = { vertical: 'middle', horizontal: column.align ?? 'left' };
+    sheet.getColumn(index + 1).width = Math.max(12, Math.round((column.width ?? 120) / 8));
+  });
+  headerRow.commit();
+
+  const firstDataRow = 8;
+  report.rows.forEach((row, rowIndex) => {
+    const excelRow = sheet.getRow(firstDataRow + rowIndex);
+    report.columns.forEach((column, columnIndex) => {
+      const cell = excelRow.getCell(columnIndex + 1);
+      const value = row[column.key];
+      cell.value = value === null || value === undefined
+        ? ''
+        : typeof value === 'number' || typeof value === 'boolean'
+          ? value
+          : String(value);
+      cell.font = { size: 9 };
+      cell.alignment = { vertical: 'middle', horizontal: column.align ?? 'left' };
+      if (typeof value === 'number') cell.numFmt = '#,##0.00';
+    });
+    excelRow.commit();
+  });
+
+  let totalsRow = firstDataRow + report.rows.length + 2;
+  const totalsTitle = sheet.getRow(totalsRow);
+  totalsTitle.getCell(1).value = 'Totals';
+  totalsTitle.getCell(1).font = { bold: true, size: 10 };
+  totalsTitle.commit();
+  totalsRow += 1;
+
+  for (const [label, value] of report.totals) {
+    const row = sheet.getRow(totalsRow);
+    row.getCell(1).value = label;
+    row.getCell(1).font = { bold: true, size: 9 };
+    row.getCell(2).value = value;
+    row.getCell(2).font = { size: 9 };
+    row.commit();
+    totalsRow += 1;
+  }
+
+  sheet.views = [{ state: 'frozen', ySplit: 7 }];
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}

@@ -1,5 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 
 import { navigationForRole } from '../../lib/navigation';
@@ -13,6 +14,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ open, onClose }: SidebarProps) {
+  const { t } = useTranslation();
   const { user, logout } = useAuth();
   const location = useLocation();
   const sections = navigationForRole(user?.role ?? 'MEMBER');
@@ -68,7 +70,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           {sections.map((section) => (
             <div key={section.title}>
               <p className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                {section.title}
+                {t(section.title)}
               </p>
               <ul className="space-y-1">
                 {section.items.map((item) => (
@@ -76,8 +78,8 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                     {item.pending ? (
                       <span aria-disabled="true" title="This module is not implemented yet" className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground/60">
                         <item.icon className="h-4 w-4 shrink-0" />
-                        <span>{item.label}</span>
-                        <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium">Pending</span>
+                        <span>{t(item.label)}</span>
+                        <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium">{t('nav.pending')}</span>
                       </span>
                     ) : (
                       <NavLink
@@ -94,7 +96,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                         }
                       >
                         <item.icon className="h-4 w-4 shrink-0" />
-                        {item.label}
+                        {t(item.label)}
                       </NavLink>
                     )}
                   </li>
@@ -114,7 +116,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
               <p className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">{user?.role?.replace('_', ' ')}</p>
             </div>
-            <button onClick={() => void handleLogout()} className="btn-ghost px-2 py-1 text-xs" aria-label="Sign out">Sign out</button>
+            <button onClick={() => void handleLogout()} className="btn-ghost px-2 py-1 text-xs" aria-label={t('nav.logout')}>{t('nav.logout')}</button>
           </div>
         </div>
       </aside>

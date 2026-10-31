@@ -18,46 +18,342 @@
     "no": "Não",
     "error": "Erro",
     "success": "Sucesso",
-    "noData": "Sem dados"
+    "noData": "Sem dados",
+    "retry": "Tentar novamente",
+    "open": "Abrir",
+    "close": "Fechar",
+    "actions": "Ações",
+    "all": "Todos",
+    "none": "Nenhum",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "loadingSession": "Verificando sua sessão…"
   },
   "nav": {
+    "platform": "Plataforma",
+    "overview": "Visão geral",
+    "gyms": "Academias",
+    "management": "Gestão da academia",
+    "training": "Treinamento",
+    "myGym": "Minha academia",
+    "myTraining": "Meu treinamento",
+    "myAccount": "Minha conta",
     "dashboard": "Painel",
+    "gymInfo": "Informações da academia",
     "members": "Alunos",
     "instructors": "Instrutores",
-    "plans": "Planos",
+    "plans": "Planos de matrícula",
     "subscriptions": "Matrículas",
     "payments": "Pagamentos",
-    "receivables": "Recebíveis",
+    "receivables": "Contas a receber",
     "cash": "Caixa",
     "attendance": "Presenças",
-    "exercises": "Exercícios",
     "routines": "Treinos",
+    "exercises": "Catálogo de exercícios",
     "reports": "Relatórios",
+    "announcements": "Avisos",
+    "audit": "Auditoria",
+    "notifications": "Notificações",
     "settings": "Configurações",
-    "profile": "Perfil",
-    "logout": "Sair"
+    "myMembers": "Meus alunos",
+    "myProfile": "Meu perfil",
+    "home": "Início",
+    "myRoutine": "Meu treino",
+    "myAttendances": "Minhas presenças",
+    "myMembership": "Minha matrícula",
+    "myPayments": "Meus pagamentos",
+    "notices": "Avisos",
+    "logout": "Sair",
+    "pending": "Pendente",
+    "available": "Disponível"
   },
-  "auth": {
-    "login": "Entrar",
+  "topbar": {
+    "toggleSidebar": "Alternar menu lateral",
+    "toggleTheme": "Alternar tema",
+    "welcome": "Bem-vindo de volta, {{name}}",
+    "language": "Idioma",
+    "notifications": "Notificações",
+    "markAllRead": "Marcar todas",
+    "noNotifications": "Você não tem notificações.",
+    "viewHistory": "Ver histórico completo",
+    "loading": "Carregando…",
+    "unread": "{{count}} não lidas",
+    "personalLanguageHint": "Preferência pessoal: não altera o idioma da academia."
+  },
+  "login": {
+    "checkingSession": "Verificando sua sessão…",
+    "subtitle": "Entre na sua conta",
     "email": "E-mail",
     "password": "Senha",
-    "signIn": "Entrar"
+    "signIn": "Entrar",
+    "signInError": "Não foi possível entrar. Tente novamente.",
+    "invalidCredentials": "Credenciais inválidas."
+  },
+  "reports": {
+    "title": "Painel e relatórios",
+    "subtitle": "Métricas reais de {{gym}} · {{from}} a {{to}}",
+    "period": "Período",
+    "customFrom": "Data inicial",
+    "customTo": "Data final",
+    "dateError": "Selecione a data inicial e final.",
+    "dateOrderError": "A data final deve ser igual ou posterior à inicial.",
+    "refresh": "Atualizar",
+    "loadError": "Não foi possível carregar o painel",
+    "exportError": "Não foi possível exportar",
+    "currentValueNote": "Os indicadores marcados como «Valor atual» refletem o estado de hoje e não mudam com o período selecionado. As receitas excluem pagamentos anulados.",
+    "currentValue": "Valor atual",
+    "sevenDayWindow": "Janela de 7 dias",
+    "today": "Hoje",
+    "currentMonth": "Mês atual",
+    "excludingVoided": "Sem pagamentos anulados",
+    "calculatedBalance": "Saldo calculado",
+    "cards": {
+      "totalMembers": "Alunos registrados",
+      "activeMembers": "Alunos ativos",
+      "inactiveMembers": "Inativos ou suspensos",
+      "activeMemberships": "Matrículas vigentes",
+      "expiringSoon": "Próximas do vencimento",
+      "expiredMemberships": "Matrículas vencidas",
+      "todayAttendance": "Presenças do dia",
+      "monthAttendance": "Presenças do mês",
+      "monthRevenue": "Receitas registradas no mês",
+      "pendingDebt": "Dívidas pendentes"
+    },
+    "charts": {
+      "attendanceByDay": "Presenças por dia",
+      "attendanceByDaySubtitle": "Registros do período selecionado",
+      "attendanceByMethod": "Presenças por método",
+      "attendanceByMethodSubtitle": "Manual e QR no período",
+      "revenueByMonth": "Receitas registradas por mês",
+      "revenueByMonthSubtitle": "Pagamentos não anulados",
+      "revenueByMethod": "Distribuição por método de pagamento",
+      "revenueByMethodSubtitle": "Somente receitas válidas",
+      "membershipStatus": "Estado atual das matrículas",
+      "membershipStatusSubtitle": "Valor atual, independente do período",
+      "newMembers": "Novos alunos",
+      "newMembersSubtitle": "Por mês do período",
+      "renewals": "Renovações registradas",
+      "renewalsSubtitle": "Matrículas com vínculo anterior",
+      "peakHours": "Presenças por hora",
+      "peakHoursSubtitle": "Maior movimento do período",
+      "noData": "Sem dados para o período",
+      "total": "Total",
+      "totalPagos": "{{total}} pagamentos",
+      "peak": "Maior movimento",
+      "notEnoughData": "Dados insuficientes",
+      "peakSummary": "{{value}} presenças no dia de maior movimento ({{day}}).",
+      "peakDataSource": "Calculado apenas com registros do período.",
+      "noComparison": "Sem período anterior comparável",
+      "comparison": "{{value}}% vs. período anterior"
+    },
+    "expiring": {
+      "title": "Matrículas próximas do vencimento",
+      "subtitle": "Vencimentos dentro da janela configurada",
+      "member": "Aluno",
+      "status": "Status",
+      "expires": "Vence",
+      "empty": "Nenhuma matrícula próxima do vencimento",
+      "viewMembersReport": "Ver relatório de alunos"
+    },
+    "status": {
+      "ACTIVE": "Vigentes",
+      "EXPIRED": "Vencidas",
+      "CANCELLED": "Canceladas",
+      "PENDING": "Pendentes",
+      "FROZEN": "Congeladas"
+    },
+    "method": {
+      "CASH": "Dinheiro",
+      "TRANSFER": "Transferência",
+      "BANK_TRANSFER": "Transferência bancária",
+      "CARD": "Cartão",
+      "CHECK": "Cheque",
+      "OTHER": "Outro",
+      "MANUAL": "Manual",
+      "QR": "QR"
+    },
+    "periods": {
+      "today": "Hoje",
+      "7d": "Últimos 7 dias",
+      "30d": "Últimos 30 dias",
+      "month": "Mês atual",
+      "previous_month": "Mês anterior",
+      "year": "Ano atual",
+      "custom": "Período personalizado"
+    }
   },
   "settings": {
-    "title": "Configurações da Academia",
+    "title": "Configurações da academia",
+    "subtitle": "Gerencie {{gym}}, as regras operacionais e sua conta de administrador.",
     "sections": {
-      "business": "Informações da Academia",
-      "localization": "Idioma e Região",
-      "hours": "Horários",
-      "operations": "Configurações Operacionais",
-      "appearance": "Aparência",
-      "profile": "Preferências Pessoais"
+      "business": "Informações da academia",
+      "operations": "Configurações operacionais",
+      "profile": "Perfil do administrador",
+      "localization": "Idioma e região"
     },
     "language": "Idioma",
     "defaultLanguage": "Idioma padrão da academia",
+    "defaultLanguageHint": "Usado quando o usuário não tem preferência pessoal. Não altera preferências já salvas.",
     "personalLanguage": "Idioma pessoal",
+    "personalLanguageHint": "Sua preferência pessoal tem prioridade sobre o idioma da academia.",
     "timezone": "Fuso horário",
     "country": "País",
-    "currency": "Moeda"
+    "currency": "Moeda",
+    "locale": "Região para formatos de data e número",
+    "saveLocalization": "Salvar idioma e região",
+    "localizationSaved": "Idioma e região salvos. As alterações se aplicam aos usuários sem preferência pessoal.",
+    "localizationWarning": "Alterar o idioma padrão afeta todos os usuários sem preferência pessoal.",
+    "selectLanguage": "Selecione um idioma"
+  },
+  "notifications": {
+    "title": "Notificações",
+    "subtitle": "Histórico pessoal. Somente você pode ver e marcar estas notificações como lidas.",
+    "markAll": "Marcar todas como lidas",
+    "type": "Tipo",
+    "status": "Status",
+    "allTypes": "Todos os tipos",
+    "allStatuses": "Todas",
+    "unread": "Não lidas",
+    "read": "Lidas",
+    "markRead": "Marcar como lida",
+    "open": "Abrir",
+    "empty": "Nenhuma notificação corresponde a estes filtros.",
+    "loading": "Carregando notificações…",
+    "loadError": "Não foi possível carregar as notificações",
+    "summary": "{{total}} notificações · {{unread}} não lidas",
+    "page": "Página {{page}} de {{total}}",
+    "readAt": "Lida {{date}}",
+    "types": {
+      "MEMBERSHIP_EXPIRING": "Matrícula próxima do vencimento",
+      "MEMBERSHIP_EXPIRED": "Matrícula vencida",
+      "MEMBERSHIP_RENEWED": "Matrícula renovada",
+      "MEMBERSHIP_STATUS": "Mudança de matrícula",
+      "ROUTINE_ASSIGNED": "Treino atribuído",
+      "ROUTINE_UPDATED": "Treino atualizado",
+      "PAYMENT_REGISTERED": "Pagamento registrado",
+      "PAYMENT_VOIDED": "Pagamento anulado",
+      "PAYMENT_PENDING": "Saldo pendente",
+      "ANNOUNCEMENT": "Aviso",
+      "GENERAL": "Geral",
+      "INSTRUCTOR_NOTICE": "Aviso ao instrutor"
+    }
+  },
+  "audit": {
+    "title": "Auditoria",
+    "subtitle": "Registro somente leitura. Valores sensíveis são ocultados ao serem exibidos.",
+    "platform": "PLATAFORMA",
+    "gymAdministration": "ADMINISTRAÇÃO DA ACADEMIA",
+    "search": "Pesquisar",
+    "searchPlaceholder": "Usuário, entidade ou identificador",
+    "action": "Ação",
+    "allActions": "Todas",
+    "entity": "Entidade",
+    "from": "De",
+    "to": "Até",
+    "apply": "Aplicar filtros",
+    "clear": "Limpar",
+    "summary": "{{total}} eventos · escopo {{scope}}",
+    "scopeGym": "da academia",
+    "scopeGlobal": "global",
+    "date": "Data",
+    "actor": "Ator",
+    "result": "Resultado",
+    "detail": "Detalhe",
+    "view": "Ver",
+    "hide": "Ocultar",
+    "oldValues": "Valores anteriores",
+    "newValues": "Valores novos",
+    "noEvents": "Nenhum evento corresponde aos filtros.",
+    "loadError": "Não foi possível consultar a auditoria",
+    "loading": "Carregando eventos…",
+    "systemActor": "Sistema / removido",
+    "page": "Página {{page}} de {{total}}",
+    "gym": "Academia",
+    "actions": {
+      "CREATE": "Criação",
+      "UPDATE": "Alteração",
+      "DELETE": "Exclusão",
+      "RESTORE": "Restauração",
+      "LOGIN": "Entrada",
+      "LOGOUT": "Saída",
+      "EXPORT": "Exportação",
+      "IMPORT": "Importação",
+      "ASSIGN": "Atribuição",
+      "UNASSIGN": "Remoção de atribuição",
+      "PAYMENT_REGISTERED": "Pagamento registrado",
+      "ATTENDANCE_MARKED": "Presença registrada",
+      "ROUTINE_ASSIGNED": "Treino atribuído"
+    }
+  },
+  "dashboard": {
+    "adminLabel": "ADMINISTRAÇÃO DA ACADEMIA",
+    "loading": "Carregando o painel da sua academia…",
+    "loadError": "O painel da academia não está disponível",
+    "gymSettings": "Configurações da academia",
+    "modulesTitle": "Módulos da academia",
+    "modulesHint": "Cada ferramenta abre sua seção real e usa os dados registrados.",
+    "paymentsDisclaimer": "Os pagamentos são registros administrativos; não há cobranças on-line habilitadas.",
+    "cards": {
+      "activeMembers": "Alunos ativos",
+      "registeredHint": "{{total}} alunos registrados",
+      "activeMemberships": "Matrículas vigentes",
+      "expiringHint": "{{count}} próximas do vencimento",
+      "todayAttendance": "Presenças de hoje",
+      "monthHint": "{{count}} no mês",
+      "monthRevenue": "Receitas do mês",
+      "excludingVoided": "Sem pagamentos anulados",
+      "pendingDebt": "Dívidas pendentes",
+      "calculatedBalance": "Saldo calculado"
+    },
+    "modules": {
+      "gymInfo": {
+        "title": "Informações da academia",
+        "description": "Dados comerciais, localização, logotipo e moeda."
+      },
+      "members": {
+        "title": "Alunos",
+        "description": "Diretório de alunos e atribuições."
+      },
+      "instructors": {
+        "title": "Instrutores",
+        "description": "Contas de instrutores e alunos atribuídos."
+      },
+      "plans": {
+        "title": "Planos de matrícula",
+        "description": "Preços, durações e condições por academia."
+      },
+      "subscriptions": {
+        "title": "Matrículas",
+        "description": "Altas, renovações, histórico e vencimentos."
+      },
+      "payments": {
+        "title": "Pagamentos",
+        "description": "Registros administrativos de pagamentos recebidos fora da plataforma."
+      },
+      "receivables": {
+        "title": "Contas a receber",
+        "description": "Cobranças, pagamentos parciais e dívidas vencidas."
+      },
+      "cash": {
+        "title": "Caixa",
+        "description": "Sessões diárias, abertura e fechamento."
+      },
+      "attendance": {
+        "title": "Presenças",
+        "description": "Registro manual e QR, regras de acesso e histórico."
+      },
+      "routines": {
+        "title": "Treinos",
+        "description": "Construtor, atribuições, versões e histórico."
+      },
+      "reports": {
+        "title": "Relatórios",
+        "description": "Métricas reais, gráficos e exportações PDF/Excel."
+      },
+      "settings": {
+        "title": "Configurações e perfil",
+        "description": "Preferências operacionais e conta do administrador."
+      }
+    }
   }
 }

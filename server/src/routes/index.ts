@@ -20,6 +20,7 @@ import { memberPortalRouter } from './member-portal.routes.js';
 import { dashboardRouter } from './dashboard.routes.js';
 import { reportsRouter } from './reports.routes.js';
 import { notificationsRouter } from './notifications.routes.js';
+import { auditRouter } from './audit.routes.js';
 
 export const apiRouter = Router();
 
@@ -48,4 +49,5 @@ apiRouter.use('/member-portal', memberPortalRouter);
 apiRouter.use('/dashboard', dashboardRouter);
 apiRouter.use('/reports', reportsRouter);
 apiRouter.use('/notifications', notificationsRouter);
+apiRouter.use('/audit', auditRouter);
 apiRouter.use('/gyms', gymsRouter);

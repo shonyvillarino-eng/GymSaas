@@ -19,6 +19,7 @@ import {
   type Actor,
 } from '../services/routines.js';
 import { startOfGymDate } from '../services/financial.js';
+import { notifyRoutineEvent } from '../services/notifications.js';
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -334,6 +335,7 @@ export async function createRoutine(req: Request, res: Response) {
   });
 
   await audit(req, current.gymId, 'CREATE', created.id, { name: input.name, memberId: input.memberId, activate: input.activate });
+  void notifyRoutineEvent(created.id, 'assigned').catch(() => undefined);
   const detail = await prisma.routine.findFirstOrThrow({ where: { id: created.id }, select: routineDetailSelect });
   res.status(201).json({ data: { ...publicRoutineRow(detail as unknown as RoutineRow), days: detail.days } });
 }
@@ -392,6 +394,7 @@ export async function updateRoutine(req: Request, res: Response) {
   });
 
   await audit(req, current.gymId, 'UPDATE', id, { fields: Object.keys(input) });
+  void notifyRoutineEvent(id, 'updated').catch(() => undefined);
   const detail = await prisma.routine.findFirstOrThrow({ where: { id }, select: routineDetailSelect });
   res.json({ data: { ...publicRoutineRow(detail as unknown as RoutineRow), days: detail.days } });
 }
@@ -418,6 +421,7 @@ export async function activateRoutine(req: Request, res: Response) {
       return activation;
     });
     await audit(req, current.gymId, 'UPDATE', id, { action: 'ACTIVATE', superseded: result.superseded });
+    void notifyRoutineEvent(id, 'assigned').catch(() => undefined);
     const detail = await prisma.routine.findFirstOrThrow({ where: { id }, select: routineDetailSelect });
     res.json({
       data: {

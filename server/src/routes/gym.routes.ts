@@ -5,10 +5,12 @@ import { AppError } from '../middlewares/errorHandler.js';
 import {
   changeMyPassword,
   getMyGym,
+  getMyLocalization,
   getMyPreferences,
   getMyProfile,
   listMyGymInstructors,
   updateMyGym,
+  updateMyLocalization,
   updateMyPreferences,
   updateMyProfile,
   uploadMyGymLogo,
@@ -44,8 +46,8 @@ gymRouter.get('/preferences', getMyPreferences);
 gymRouter.put('/preferences', updateMyPreferences);
 gymRouter.get('/settings', getMyGym);
 gymRouter.patch('/settings', updateMyGym);
-gymRouter.get('/settings/localization', getMyGym);
-gymRouter.patch('/settings/localization', updateMyGym);
+gymRouter.get('/settings/localization', getMyLocalization);
+gymRouter.patch('/settings/localization', updateMyLocalization);
 gymRouter.get('/profile', getMyProfile);
 gymRouter.patch('/profile', updateMyProfile);
 gymRouter.put('/profile/password', changeMyPassword);

@@ -8,6 +8,9 @@ import {
   CreditCard,
   Dumbbell,
   Pencil,
+  KeyRound,
+  Copy,
+  Check,
   UserRoundCog,
   Users,
 } from 'lucide-react';
@@ -57,6 +60,9 @@ export function GymMemberDetailPage() {
   const [nextStatus, setNextStatus] = useState<'INACTIVE' | 'SUSPENDED' | 'ACTIVE'>('SUSPENDED');
   const [statusReason, setStatusReason] = useState('');
   const [instructorChoice, setInstructorChoice] = useState('');
+  const [portalInvite, setPortalInvite] = useState<{ setupUrl: string; setupExpiresAt: string; email: string } | null>(null);
+  const [portalBusy, setPortalBusy] = useState(false);
+  const [portalCopied, setPortalCopied] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -93,6 +99,27 @@ export function GymMemberDetailPage() {
       setActionError(apiErrorMessage(cause));
     } finally {
       setBusy(false);
+    }
+  };
+
+  const grantPortalAccess = async () => {
+    if (!window.confirm('¿Generar un enlace de acceso al portal para este socio? El enlace anterior dejará de funcionar.')) return;
+    setPortalBusy(true);
+    setActionError('');
+    setActionSuccess('');
+    setPortalInvite(null);
+    setPortalCopied(false);
+    try {
+      const result = await api<{ data: { email: string }; setupUrl: string; setupExpiresAt: string }>(
+        `/members/${id}/portal-access`,
+        { method: 'POST' },
+      );
+      setPortalInvite({ setupUrl: result.setupUrl, setupExpiresAt: result.setupExpiresAt, email: result.data.email });
+      setActionSuccess('Enlace de acceso generado. Compártelo de forma segura con el socio.');
+    } catch (cause) {
+      setActionError(apiErrorMessage(cause));
+    } finally {
+      setPortalBusy(false);
     }
   };
 
@@ -166,6 +193,9 @@ export function GymMemberDetailPage() {
               <Pencil className="h-4 w-4" /> Edit
             </Button>
           </Link>
+          <Button variant="outline" className="px-4 py-2" loading={portalBusy} onClick={() => void grantPortalAccess()}>
+            <KeyRound className="h-4 w-4" /> Portal access
+          </Button>
           <Button
             variant={member.status === 'ACTIVE' ? 'destructive' : 'primary'}
             onClick={() => {
@@ -188,6 +218,31 @@ export function GymMemberDetailPage() {
         </p>
       )}
       {actionSuccess && <SuccessState message={actionSuccess} />}
+      {portalInvite && (
+        <section className="surface-card space-y-2 p-4">
+          <p className="text-sm font-medium">Enlace de un solo uso para {portalInvite.email}</p>
+          <p className="text-xs text-muted-foreground">
+            Vence el {new Date(portalInvite.setupExpiresAt).toLocaleString('es-ES')}. No se envía ningún correo automáticamente.
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input readOnly className="input font-mono text-xs" value={portalInvite.setupUrl} onFocus={(event) => event.target.select()} />
+            <Button
+              type="button"
+              variant="outline"
+              className="shrink-0 px-3 py-2"
+              onClick={() => {
+                void navigator.clipboard.writeText(portalInvite.setupUrl).then(() => {
+                  setPortalCopied(true);
+                  window.setTimeout(() => setPortalCopied(false), 2000);
+                });
+              }}
+            >
+              {portalCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              {portalCopied ? 'Copiado' : 'Copiar'}
+            </Button>
+          </div>
+        </section>
+      )}
 
       <nav className="flex gap-1 overflow-x-auto border-b border-border" aria-label="Member detail sections">
         {TABS.map(({ id: tabId, label, icon: Icon }) => (

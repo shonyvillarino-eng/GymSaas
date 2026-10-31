@@ -2,7 +2,8 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { Building2, Check, ImagePlus, Save, UserRound, X } from 'lucide-react';
+import { Building2, Check, ImagePlus, Languages, Save, UserRound, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { ErrorState, LoadingState, SuccessState } from '../components/ui/states';
@@ -31,7 +32,14 @@ interface Preferences {
   attendancePolicy: { requireActiveMember: boolean; requireValidMembership: boolean; allowAdministrativeExceptions: boolean };
 }
 interface AdminProfile { id: string; email: string; fullName: string; phone: string | null; role: string }
-type Section = 'business' | 'operations' | 'profile';
+interface Localization {
+  language: 'es' | 'en' | 'pt';
+  locale: string | null;
+  country: string | null;
+  timezone: string;
+  currency: string;
+}
+type Section = 'business' | 'operations' | 'localization' | 'profile';
 
 const days = [
   ['MONDAY', 'Monday'], ['TUESDAY', 'Tuesday'], ['WEDNESDAY', 'Wednesday'], ['THURSDAY', 'Thursday'], ['FRIDAY', 'Friday'], ['SATURDAY', 'Saturday'], ['SUNDAY', 'Sunday'],
@@ -51,10 +59,14 @@ const emptyPreferences: Preferences = {
 const zodMessage = apiErrorMessage;
 
 export function GymSettingsPage() {
-  const { updateUser } = useAuth();
+  const { t } = useTranslation();
+  const { updateUser, language: personalLanguage, setLanguage, refresh } = useAuth();
   const [gym, setGym] = useState<GymData | null>(null);
   const [preferences, setPreferences] = useState<Preferences>(emptyPreferences);
   const [admin, setAdmin] = useState<AdminProfile | null>(null);
+  const [localization, setLocalization] = useState<Localization | null>(null);
+  const [savingLocalization, setSavingLocalization] = useState(false);
+  const [localizationSaved, setLocalizationSaved] = useState('');
   const [section, setSection] = useState<Section>('business');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -72,8 +84,11 @@ export function GymSettingsPage() {
   const load = async () => {
     setLoading(true); setLoadError('');
     try {
-      const [gymResult, prefResult, adminResult] = await Promise.all([
-        api<{ data: GymData }>('/gym'), api<{ data: Preferences }>('/gym/preferences'), api<{ data: AdminProfile }>('/gym/profile'),
+      const [gymResult, prefResult, adminResult, localizationResult] = await Promise.all([
+        api<{ data: GymData }>('/gym'),
+        api<{ data: Preferences }>('/gym/preferences'),
+        api<{ data: AdminProfile }>('/gym/profile'),
+        api<{ data: Localization }>('/gym/settings/localization'),
       ]);
       setGym(gymResult.data); reset({
         name: gymResult.data.name, email: gymResult.data.email ?? '', phone: gymResult.data.phone ?? '',
@@ -81,7 +96,7 @@ export function GymSettingsPage() {
         postalCode: gymResult.data.postalCode ?? '', country: gymResult.data.country ?? '',
         timezone: gymResult.data.timezone, currency: gymResult.data.currency as ProfileForm['currency'],
       });
-      setPreferences(prefResult.data); setAdmin(adminResult.data);
+      setPreferences(prefResult.data); setAdmin(adminResult.data); setLocalization(localizationResult.data);
     } catch (cause) { setLoadError(zodMessage(cause)); }
     finally { setLoading(false); }
   };
@@ -125,6 +140,29 @@ export function GymSettingsPage() {
     finally { setSavingPreferences(false); }
   };
 
+  const saveLocalization = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!localization) return;
+    setSavingLocalization(true); setFormError(''); setSuccess(''); setLocalizationSaved('');
+    try {
+      const saved = await api<{ data: Localization }>('/gym/settings/localization', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          language: localization.language,
+          locale: localization.locale || undefined,
+          country: localization.country,
+          timezone: localization.timezone,
+          currency: localization.currency,
+        }),
+      });
+      setLocalization(saved.data);
+      setLocalizationSaved(t('settings.localizationSaved'));
+      // Re-resolve the effective language: the gym default may now apply.
+      await refresh();
+    } catch (cause) { setFormError(zodMessage(cause)); }
+    finally { setSavingLocalization(false); }
+  };
+
   const saveAdminProfile = async (event: FormEvent) => {
     event.preventDefault(); setSavingAdmin(true); setFormError(''); setSuccess('');
     try {
@@ -155,10 +193,15 @@ export function GymSettingsPage() {
 
   const updateSchedule = (day: string, update: Partial<DaySchedule>) => setPreferences((current) => ({ ...current, schedule: current.schedule.map((item) => item.day === day ? { ...item, ...update } : item) }));
   const notice = (text: string) => formError ? <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">{formError}</p> : success ? <SuccessState message={success || text} /> : null;
-  const tabs: { id: Section; label: string; icon: typeof Building2 }[] = [{ id: 'business', label: 'Gym information', icon: Building2 }, { id: 'operations', label: 'Operating preferences', icon: Save }, { id: 'profile', label: 'Administrator profile', icon: UserRound }];
+  const tabs: { id: Section; label: string; icon: typeof Building2 }[] = [
+    { id: 'business', label: t('settings.sections.business'), icon: Building2 },
+    { id: 'operations', label: t('settings.sections.operations'), icon: Save },
+    { id: 'localization', label: t('settings.sections.localization'), icon: Languages },
+    { id: 'profile', label: t('settings.sections.profile'), icon: UserRound },
+  ];
 
   return <div className="mx-auto max-w-5xl space-y-6">
-    <header><p className="text-sm font-medium text-primary">GYM ADMINISTRATION</p><h1 className="mt-1 text-2xl font-bold tracking-tight">Gym settings</h1><p className="text-sm text-muted-foreground">Manage {gym.name}, operating rules and your administrator account.</p></header>
+    <header><p className="text-sm font-medium text-primary">GYM ADMINISTRATION</p><h1 className="mt-1 text-2xl font-bold tracking-tight">{t('settings.title')}</h1><p className="text-sm text-muted-foreground">{t('settings.subtitle', { gym: gym.name })}</p></header>
     <nav className="flex gap-1 overflow-x-auto border-b border-border" aria-label="Settings sections">{tabs.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => { setSection(id); setFormError(''); setSuccess(''); }} className={`inline-flex shrink-0 items-center gap-2 border-b-2 px-3 py-3 text-sm font-medium ${section === id ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}><Icon className="h-4 w-4" />{label}</button>)}</nav>
 
     {section === 'business' && <form onSubmit={saveBusiness} className="space-y-5">
@@ -175,6 +218,80 @@ export function GymSettingsPage() {
       <section className="surface-card p-5 sm:p-6"><h2 className="mb-4 font-semibold">Internal receipt details</h2><div className="grid gap-4 sm:grid-cols-2"><Input label="Business name" value={preferences.receipt.businessName} onChange={(event) => setPreferences((p) => ({ ...p, receipt: { ...p.receipt, businessName: event.target.value } }))} /><Input label="Tax ID" value={preferences.receipt.taxId} onChange={(event) => setPreferences((p) => ({ ...p, receipt: { ...p.receipt, taxId: event.target.value } }))} /><Input label="Receipt address" value={preferences.receipt.address} onChange={(event) => setPreferences((p) => ({ ...p, receipt: { ...p.receipt, address: event.target.value } }))} /><Input label="Receipt phone" value={preferences.receipt.phone} onChange={(event) => setPreferences((p) => ({ ...p, receipt: { ...p.receipt, phone: event.target.value } }))} /><label className="sm:col-span-2"><span className="label">Footer</span><textarea maxLength={500} className="input min-h-20" value={preferences.receipt.footer} onChange={(event) => setPreferences((p) => ({ ...p, receipt: { ...p.receipt, footer: event.target.value } }))} /></label></div></section>
       <section className="surface-card p-5 sm:p-6"><h2 className="mb-4 font-semibold">Notification preferences</h2><div className="space-y-3">{([['membershipExpiry', 'Membership expiry reminders'], ['attendance', 'Attendance notifications'], ['administrativeActivity', 'Administrative activity']] as const).map(([key, label]) => <label key={key} className="flex items-center gap-3 text-sm"><input type="checkbox" checked={preferences.notifications[key]} onChange={(event) => setPreferences((p) => ({ ...p, notifications: { ...p.notifications, [key]: event.target.checked } }))} />{label}</label>)}</div></section>
       {formError && notice('')}{success && notice('')}<div className="flex justify-end"><Button type="submit" loading={savingPreferences} className="px-4 py-2"><Save className="h-4 w-4" /> Save preferences</Button></div>
+    </form>}
+
+    {section === 'localization' && localization && <form onSubmit={(event) => void saveLocalization(event)} className="space-y-5">
+      <section className="surface-card p-5 sm:p-6">
+        <h2 className="font-semibold">{t('settings.sections.localization')}</h2>
+        <p className="mb-5 text-sm text-muted-foreground">{t('settings.defaultLanguageHint')}</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label>
+            <span className="label">{t('settings.defaultLanguage')}</span>
+            <select className="input" value={localization.language} onChange={(event) => setLocalization({ ...localization, language: event.target.value as Localization['language'] })}>
+              <option value="es">Español</option>
+              <option value="en">English</option>
+              <option value="pt">Português</option>
+            </select>
+          </label>
+          <label>
+            <span className="label">{t('settings.locale')}</span>
+            <select className="input" value={localization.locale ?? ''} onChange={(event) => setLocalization({ ...localization, locale: event.target.value })}>
+              <option value="es-ES">es-ES</option>
+              <option value="es-AR">es-AR</option>
+              <option value="es-MX">es-MX</option>
+              <option value="en-US">en-US</option>
+              <option value="en-GB">en-GB</option>
+              <option value="pt-BR">pt-BR</option>
+              <option value="pt-PT">pt-PT</option>
+            </select>
+          </label>
+          <label>
+            <span className="label">{t('settings.country')}</span>
+            <input className="input" maxLength={80} value={localization.country ?? ''} onChange={(event) => setLocalization({ ...localization, country: event.target.value })} />
+          </label>
+          <label>
+            <span className="label">{t('settings.timezone')}</span>
+            <select className="input" value={localization.timezone} onChange={(event) => setLocalization({ ...localization, timezone: event.target.value })}>
+              <option value="America/Argentina/Buenos_Aires">America/Argentina/Buenos_Aires</option>
+              <option value="America/Argentina/Cordoba">America/Argentina/Cordoba</option>
+              <option value="America/Santiago">America/Santiago</option>
+              <option value="America/Montevideo">America/Montevideo</option>
+              <option value="America/Sao_Paulo">America/Sao_Paulo</option>
+              <option value="America/Mexico_City">America/Mexico_City</option>
+              <option value="America/New_York">America/New_York</option>
+              <option value="America/Los_Angeles">America/Los_Angeles</option>
+              <option value="Europe/Madrid">Europe/Madrid</option>
+              <option value="UTC">UTC</option>
+              {!['America/Argentina/Buenos_Aires','America/Argentina/Cordoba','America/Santiago','America/Montevideo','America/Sao_Paulo','America/Mexico_City','America/New_York','America/Los_Angeles','Europe/Madrid','UTC'].includes(localization.timezone) && <option value={localization.timezone}>{localization.timezone}</option>}
+            </select>
+          </label>
+          <label>
+            <span className="label">{t('settings.currency')}</span>
+            <select className="input" value={localization.currency} onChange={(event) => setLocalization({ ...localization, currency: event.target.value })}>
+              {['ARS', 'USD', 'EUR', 'BRL', 'CLP', 'UYU', 'MXN'].map((code) => <option key={code} value={code}>{code}</option>)}
+            </select>
+          </label>
+        </div>
+        <p className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+          {t('settings.localizationWarning')}
+        </p>
+      </section>
+
+      <section className="surface-card p-5 sm:p-6">
+        <h2 className="font-semibold">{t('settings.personalLanguage')}</h2>
+        <p className="mb-4 text-sm text-muted-foreground">{t('settings.personalLanguageHint')}</p>
+        <select className="input max-w-xs" aria-label={t('settings.personalLanguage')} value={personalLanguage} onChange={(event) => void setLanguage(event.target.value as 'es' | 'en' | 'pt').catch((cause) => setFormError(zodMessage(cause)))}>
+          <option value="es">Español</option>
+          <option value="en">English</option>
+          <option value="pt">Português</option>
+        </select>
+      </section>
+
+      {formError && notice('')}
+      {localizationSaved && <SuccessState message={localizationSaved} />}
+      <div className="flex justify-end">
+        <Button type="submit" loading={savingLocalization} className="px-4 py-2"><Save className="h-4 w-4" /> {t('settings.saveLocalization')}</Button>
+      </div>
     </form>}
 
     {section === 'profile' && admin && <div className="space-y-5"><section className="surface-card p-5 sm:p-6"><h2 className="font-semibold">Administrator details</h2><p className="mb-5 text-sm text-muted-foreground">Your email identifies your sign-in account and cannot be changed here.</p><form onSubmit={(event) => void saveAdminProfile(event)} className="grid gap-4 sm:grid-cols-2"><Input label="Full name" required value={admin.fullName} onChange={(event) => setAdmin({ ...admin, fullName: event.target.value })} /><Input label="Phone" type="tel" value={admin.phone ?? ''} onChange={(event) => setAdmin({ ...admin, phone: event.target.value })} /><Input label="Sign-in email" type="email" readOnly value={admin.email} /><div className="sm:col-span-2 flex justify-end"><Button type="submit" loading={savingAdmin} className="px-4 py-2"><Save className="h-4 w-4" /> Save profile</Button></div></form></section>

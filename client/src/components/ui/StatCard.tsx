@@ -5,9 +5,10 @@ interface StatCardProps {
   value: string | number;
   icon: LucideIcon;
   trend?: { value: string; positive: boolean };
+  hint?: string;
 }
 
-export function StatCard({ title, value, icon: Icon, trend }: StatCardProps) {
+export function StatCard({ title, value, icon: Icon, trend, hint }: StatCardProps) {
   return (
     <div className="surface-card p-5 flex flex-col gap-3">
       <div className="flex items-center justify-between">
@@ -16,8 +17,11 @@ export function StatCard({ title, value, icon: Icon, trend }: StatCardProps) {
           <Icon className="h-4 w-4" />
         </div>
       </div>
-      <div className="flex items-end justify-between">
-        <p className="text-3xl font-bold tracking-tight">{value}</p>
+      <div className="flex items-end justify-between gap-2">
+        <div>
+          <p className="text-3xl font-bold tracking-tight">{value}</p>
+          {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
+        </div>
         {trend && (
           <span
             className={`text-xs font-medium px-2 py-0.5 rounded-full ${

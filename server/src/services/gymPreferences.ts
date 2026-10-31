@@ -65,6 +65,8 @@ export async function loadGymPreferences(gymId: string) {
       name: true,
       timezone: true,
       currency: true,
+      language: true,
+      locale: true,
       isActive: true,
       logoUrl: true,
       settings: true,

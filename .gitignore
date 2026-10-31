@@ -37,5 +37,8 @@ pnpm-debug.log*
 prisma/dev.db
 server/.env
 server/prisma/*.db
+# Local embedded PostgreSQL cluster used by the integration suites
+.pgdata/
+server/.pgdata/
 yarn-debug.log*
 yarn-error.log*

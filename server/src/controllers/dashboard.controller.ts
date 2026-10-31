@@ -67,7 +67,7 @@ export async function getDashboardOverview(req: {
     }),
     prisma.gym.findUnique({
       where: { id: gymId },
-      select: { id: true, name: true, logoUrl: true },
+      select: { id: true, name: true, logoUrl: true, currency: true },
     }),
   ]);
 
@@ -103,7 +103,7 @@ export async function getDashboardOverview(req: {
       thisMonth: attendanceMonth,
     },
     revenue: {
-      currency: 'ARS',
+      currency: gym?.currency ?? 'USD',
       collectedThisMonth: Number(paidThisMonth._sum.amount || 0),
       collectedThisMonthCount: paymentsThisMonthCount,
       pendingObligations: pendingOutstanding,
@@ -163,6 +163,33 @@ export async function getDashboardAttendance(req: {
 
   const total = byDay.reduce((acc, row) => acc + row.count, 0);
 
+  // Previous period of identical length, used for the comparison metric.
+  const span = toDate.getTime() - fromDate.getTime() + 1;
+  const previousFrom = new Date(fromDate.getTime() - span);
+  const previousTo = new Date(fromDate.getTime() - 1);
+
+  const [byHour, previousCount] = await Promise.all([
+    prisma.$queryRaw<Array<{ hour: number; count: number }>>`
+      SELECT EXTRACT(HOUR FROM "checkInTime")::int AS hour, COUNT(*)::int AS count
+      FROM "Attendance"
+      WHERE "gymId" = ${gymId}
+        AND "checkInTime" >= ${fromDate}
+        AND "checkInTime" <= ${toDate}
+        AND "deletedAt" IS NULL
+      GROUP BY 1
+      ORDER BY count DESC
+    `,
+    prisma.attendance.count({
+      where: { gymId, deletedAt: null, checkInTime: { gte: previousFrom, lte: previousTo } },
+    }),
+  ]);
+
+  const peakDay = byDay.reduce<{ day: string; count: number } | null>(
+    (best, row) => (!best || row.count > best.count ? row : best),
+    null,
+  );
+  const peakHour = byHour.length > 0 ? byHour[0] : null;
+
   return {
     period: {
       label: q.period === 'custom' ? 'Personalizado' : q.period,
@@ -170,7 +197,17 @@ export async function getDashboardAttendance(req: {
       to: dbDateLiteral(toDate),
     },
     byDay: byDay.map((r) => ({ day: r.day, count: r.count })),
+    // Alias consumed by the reports chart; keeps both contracts working.
+    series: byDay.map((r) => ({ date: r.day, count: r.count })),
     byMethod: byMethod.map((r) => ({ method: r.method, count: r.count })),
+    byHour: byHour.map((r) => ({ hour: r.hour, count: r.count })),
+    peak: total > 0 ? { day: peakDay?.day ?? null, hour: peakHour?.hour ?? null, count: peakDay?.count ?? 0 } : null,
+    comparison: {
+      previousTotal: previousCount,
+      changePct: previousCount === 0 ? null : Number((((total - previousCount) / previousCount) * 100).toFixed(1)),
+      previousFrom: dbDateLiteral(previousFrom),
+      previousTo: dbDateLiteral(previousTo),
+    },
     total,
   };
 }
@@ -215,6 +252,38 @@ export async function getDashboardRevenue(req: {
   const total = rows.reduce((acc, r) => acc + Number(r.amount), 0);
   const count = rows.reduce((acc, r) => acc + r.count, 0);
 
+  const span = toDate.getTime() - fromDate.getTime() + 1;
+  const previousFrom = new Date(fromDate.getTime() - span);
+  const previousTo = new Date(fromDate.getTime() - 1);
+
+  // Distribution by payment method: voided records are excluded, as they are
+  // not valid income (they remain visible in the payments module, not here).
+  const [byMethod, previous] = await Promise.all([
+    prisma.$queryRaw<Array<{ method: string; amount: number; count: number }>>`
+      SELECT "method", COALESCE(SUM("amount"), 0)::numeric(12,2) AS amount, COUNT(*)::int AS count
+      FROM "PaymentRecord"
+      WHERE "gymId" = ${gymId}
+        AND "status" <> 'VOIDED'
+        AND "deletedAt" IS NULL
+        AND "paidAt" >= ${fromDate}
+        AND "paidAt" <= ${toDate}
+      GROUP BY "method"
+      ORDER BY amount DESC
+    `,
+    prisma.paymentRecord.aggregate({
+      where: {
+        gymId,
+        status: { not: 'VOIDED' },
+        deletedAt: null,
+        paidAt: { gte: previousFrom, lte: previousTo },
+      },
+      _sum: { amount: true },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const previousTotal = Number(previous._sum.amount ?? 0);
+
   return {
     period: {
       label: q.period === 'custom' ? 'Personalizado' : q.period,
@@ -222,6 +291,13 @@ export async function getDashboardRevenue(req: {
       to: dbDateLiteral(toDate),
     },
     byMonth: rows.map((r) => ({ month: r.month, amount: Number(r.amount), count: r.count })),
+    series: rows.map((r) => ({ month: r.month, total: Number(r.amount), count: r.count })),
+    byMethod: byMethod.map((r) => ({ method: r.method, total: Number(r.amount), count: r.count })),
+    comparison: {
+      previousTotal,
+      previousCount: previous._count._all,
+      changePct: previousTotal === 0 ? null : Number((((total - previousTotal) / previousTotal) * 100).toFixed(1)),
+    },
     total,
     count,
   };
@@ -272,14 +348,64 @@ export async function getDashboardMemberships(req: {
   const total = rows.reduce((acc, r) => acc + r.count, 0);
 
   const now = new Date();
-  const warningEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7, 23, 59, 59, 999);
-  const expiringSoon = await prisma.memberSubscription.count({
-    where: {
-      gymId,
-      status: 'ACTIVE',
-      endDate: { gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()), lte: warningEnd },
-    },
-  });
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const warningEnd = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() + q.warningDays,
+    23,
+    59,
+    59,
+    999,
+  );
+
+  const [distributionRows, expiringSoon, newMembers, renewals, statusCounts] = await Promise.all([
+    prisma.memberSubscription.groupBy({
+      by: ['status'],
+      where: { gymId },
+      _count: { _all: true },
+    }),
+    prisma.memberSubscription.findMany({
+      where: { gymId, status: 'ACTIVE', endDate: { gte: todayStart, lte: warningEnd } },
+      orderBy: { endDate: 'asc' },
+      take: 10,
+      select: {
+        id: true,
+        endDate: true,
+        status: true,
+        member: { select: { id: true, user: { select: { fullName: true } } } },
+      },
+    }),
+    prisma.$queryRaw<Array<{ month: string; count: number }>>`
+      SELECT TO_CHAR(DATE_TRUNC('month', "joinDate"), 'YYYY-MM') AS month, COUNT(*)::int AS count
+      FROM "MemberProfile"
+      WHERE "gymId" = ${gymId}
+        AND "joinDate" >= ${fromDate}
+        AND "joinDate" <= ${toDate}
+      GROUP BY 1
+      ORDER BY 1 ASC
+    `,
+    prisma.$queryRaw<Array<{ month: string; count: number }>>`
+      SELECT TO_CHAR(DATE_TRUNC('month', s."createdAt"), 'YYYY-MM') AS month, COUNT(*)::int AS count
+      FROM "MemberSubscription" s
+      WHERE s."gymId" = ${gymId}
+        AND s."createdAt" >= ${fromDate}
+        AND s."createdAt" <= ${toDate}
+        AND EXISTS (
+          SELECT 1 FROM "MemberSubscription" previous
+          WHERE previous."memberId" = s."memberId"
+            AND previous."gymId" = s."gymId"
+            AND previous."createdAt" < s."createdAt"
+        )
+      GROUP BY 1
+      ORDER BY 1 ASC
+    `,
+    prisma.memberSubscription.count({
+      where: { gymId, status: 'ACTIVE', endDate: { gte: todayStart, lte: warningEnd } },
+    }),
+  ]);
+
+  const distribution = distributionRows.map((row) => ({ status: row.status, count: row._count._all }));
 
   return {
     period: {
@@ -289,7 +415,18 @@ export async function getDashboardMemberships(req: {
     },
     byStatus,
     total,
-    expiringSoonCount: expiringSoon,
+    // Current state, deliberately independent from the selected period.
+    distribution,
+    distributionTotal: distribution.reduce((acc, row) => acc + row.count, 0),
+    expiringSoon: expiringSoon.map((row) => ({
+      memberId: row.member.id,
+      memberName: row.member.user.fullName,
+      endDate: dbDateLiteral(row.endDate),
+      status: row.status,
+    })),
+    newMembers: newMembers.map((row) => ({ month: row.month, count: row.count })),
+    renewals: renewals.map((row) => ({ month: row.month, count: row.count })),
+    expiringSoonCount: statusCounts,
   };
 }
 

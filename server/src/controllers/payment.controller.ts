@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma.js';
 import { AppError } from '../middlewares/errorHandler.js';
 import { clientIp, writeAudit } from '../services/audit.js';
 import { buildReceiptPdf } from '../services/receipt.js';
+import { notifyPaymentRegistered, notifyPaymentVoided } from '../services/notifications.js';
 import {
   allocateReceiptNumber,
   lockObligation,
@@ -245,6 +246,12 @@ export async function createPayment(req: Request, res: Response) {
     obligationId: created.obligationId,
   });
 
+  // Delivered asynchronously and idempotently: a notification failure must
+  // never roll back or delay the payment that was already committed.
+  void notifyPaymentRegistered(created.id).catch((error) => {
+    console.error(JSON.stringify({ level: 'error', event: 'payment_notification_failed', message: error instanceof Error ? error.message : 'unknown' }));
+  });
+
   res.status(201).json({ data: created });
 }
 
@@ -295,6 +302,10 @@ export async function voidPayment(req: Request, res: Response) {
     { status: 'VOIDED', reason: input.reason, receiptNumber: result.voided.receiptNumber },
     { status: result.previousStatus },
   );
+
+  void notifyPaymentVoided(id).catch((error) => {
+    console.error(JSON.stringify({ level: 'error', event: 'payment_void_notification_failed', message: error instanceof Error ? error.message : 'unknown' }));
+  });
 
   res.json({ data: result.voided });
 }

@@ -1,6 +1,7 @@
 import { createApp } from './app.js';
 import { env } from './config/env.js';
 import { prisma } from './lib/prisma.js';
+import { startNotificationSweep } from './services/notifications.js';
 
 const app = createApp();
 
@@ -49,6 +50,9 @@ const expirationTimer =
       }, 60_000);
 expirationTimer?.unref();
 
+const stopNotificationSweep =
+  env.NODE_ENV === 'test' ? null : startNotificationSweep();
+
 const server = app.listen(env.PORT, () => {
   console.log(`✅ API listening on http://localhost:${env.PORT}/api/v1`);
   console.log(`   Health: http://localhost:${env.PORT}/api/v1/health`);
@@ -61,6 +65,7 @@ function shutdown(signal: string) {
   if (shuttingDown) return;
   shuttingDown = true;
   if (expirationTimer) clearInterval(expirationTimer);
+  stopNotificationSweep?.();
   console.log(`\n${signal} received, shutting down gracefully...`);
 
   server.close(() => {

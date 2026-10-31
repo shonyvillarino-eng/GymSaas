@@ -18,46 +18,342 @@
     "no": "No",
     "error": "Error",
     "success": "Éxito",
-    "noData": "Sin datos"
+    "noData": "Sin datos",
+    "retry": "Reintentar",
+    "open": "Abrir",
+    "close": "Cerrar",
+    "actions": "Acciones",
+    "all": "Todos",
+    "none": "Ninguno",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "loadingSession": "Comprobando tu sesión…"
   },
   "nav": {
+    "platform": "Plataforma",
+    "overview": "Resumen",
+    "gyms": "Gimnasios",
+    "management": "Gestión del gimnasio",
+    "training": "Entrenamiento",
+    "myGym": "Mi gimnasio",
+    "myTraining": "Mi entrenamiento",
+    "myAccount": "Mi cuenta",
     "dashboard": "Dashboard",
+    "gymInfo": "Información del gimnasio",
     "members": "Socios",
     "instructors": "Instructores",
-    "plans": "Planes",
+    "plans": "Planes de membresía",
     "subscriptions": "Membresías",
     "payments": "Pagos",
     "receivables": "Cuentas por cobrar",
     "cash": "Caja",
     "attendance": "Asistencia",
-    "exercises": "Ejercicios",
     "routines": "Rutinas",
+    "exercises": "Catálogo de ejercicios",
     "reports": "Reportes",
+    "announcements": "Avisos",
+    "audit": "Auditoría",
+    "notifications": "Notificaciones",
     "settings": "Configuración",
-    "profile": "Perfil",
-    "logout": "Cerrar sesión"
+    "myMembers": "Mis socios",
+    "myProfile": "Mi perfil",
+    "home": "Inicio",
+    "myRoutine": "Mi rutina",
+    "myAttendances": "Mis asistencias",
+    "myMembership": "Mi membresía",
+    "myPayments": "Mis pagos",
+    "notices": "Avisos",
+    "logout": "Cerrar sesión",
+    "pending": "Pendiente",
+    "available": "Disponible"
   },
-  "auth": {
-    "login": "Iniciar sesión",
+  "topbar": {
+    "toggleSidebar": "Alternar menú lateral",
+    "toggleTheme": "Cambiar tema",
+    "welcome": "Bienvenido de nuevo, {{name}}",
+    "language": "Idioma",
+    "notifications": "Notificaciones",
+    "markAllRead": "Marcar todas",
+    "noNotifications": "No tienes notificaciones.",
+    "viewHistory": "Ver historial completo",
+    "loading": "Cargando…",
+    "unread": "{{count}} sin leer",
+    "personalLanguageHint": "Preferencia personal: no cambia el idioma del gimnasio."
+  },
+  "login": {
+    "checkingSession": "Comprobando tu sesión…",
+    "subtitle": "Inicia sesión en tu cuenta",
     "email": "Correo electrónico",
     "password": "Contraseña",
-    "signIn": "Ingresar"
+    "signIn": "Ingresar",
+    "signInError": "No se pudo iniciar sesión. Inténtalo de nuevo.",
+    "invalidCredentials": "Credenciales inválidas."
+  },
+  "reports": {
+    "title": "Dashboard y reportes",
+    "subtitle": "Métricas reales de {{gym}} · {{from}} a {{to}}",
+    "period": "Período",
+    "customFrom": "Fecha inicial",
+    "customTo": "Fecha final",
+    "dateError": "Selecciona fecha inicial y final.",
+    "dateOrderError": "La fecha final debe ser igual o posterior a la inicial.",
+    "refresh": "Actualizar",
+    "loadError": "No se pudo cargar el dashboard",
+    "exportError": "No se pudo exportar",
+    "currentValueNote": "Los indicadores marcados como «Valor actual» reflejan el estado de hoy y no cambian con el período seleccionado. Los ingresos excluyen pagos anulados.",
+    "currentValue": "Valor actual",
+    "sevenDayWindow": "Ventana de 7 días",
+    "today": "Hoy",
+    "currentMonth": "Mes actual",
+    "excludingVoided": "Sin pagos anulados",
+    "calculatedBalance": "Saldo calculado",
+    "cards": {
+      "totalMembers": "Socios registrados",
+      "activeMembers": "Socios activos",
+      "inactiveMembers": "Inactivos o suspendidos",
+      "activeMemberships": "Membresías vigentes",
+      "expiringSoon": "Próximas a vencer",
+      "expiredMemberships": "Membresías vencidas",
+      "todayAttendance": "Asistencias del día",
+      "monthAttendance": "Asistencias del mes",
+      "monthRevenue": "Ingresos registrados del mes",
+      "pendingDebt": "Deudas pendientes"
+    },
+    "charts": {
+      "attendanceByDay": "Asistencias por día",
+      "attendanceByDaySubtitle": "Registros del período seleccionado",
+      "attendanceByMethod": "Asistencias por método",
+      "attendanceByMethodSubtitle": "Manual y QR del período",
+      "revenueByMonth": "Ingresos registrados por mes",
+      "revenueByMonthSubtitle": "Pagos no anulados",
+      "revenueByMethod": "Distribución por método de pago",
+      "revenueByMethodSubtitle": "Solo ingresos válidos",
+      "membershipStatus": "Estado actual de membresías",
+      "membershipStatusSubtitle": "Valor actual, independiente del período",
+      "newMembers": "Nuevas altas de socios",
+      "newMembersSubtitle": "Por mes del período",
+      "renewals": "Renovaciones registradas",
+      "renewalsSubtitle": "Altas con membresía previa",
+      "peakHours": "Asistencias por hora",
+      "peakHoursSubtitle": "Mayor concurrencia del período",
+      "noData": "Sin datos para el período",
+      "total": "Total",
+      "totalPagos": "{{total}} pagos",
+      "peak": "Mayor concurrencia",
+      "notEnoughData": "Sin datos suficientes",
+      "peakSummary": "{{value}} asistencias en el día de mayor concurrencia ({{day}}).",
+      "peakDataSource": "Calculado solo con registros del período.",
+      "noComparison": "Sin período anterior comparable",
+      "comparison": "{{value}}% vs. período anterior"
+    },
+    "expiring": {
+      "title": "Membresías próximas a vencer",
+      "subtitle": "Vencimientos dentro de la ventana configurada",
+      "member": "Socio",
+      "status": "Estado",
+      "expires": "Vence",
+      "empty": "Sin membresías próximas a vencer",
+      "viewMembersReport": "Ver reporte de socios"
+    },
+    "status": {
+      "ACTIVE": "Vigentes",
+      "EXPIRED": "Vencidas",
+      "CANCELLED": "Canceladas",
+      "PENDING": "Pendientes",
+      "FROZEN": "Congeladas"
+    },
+    "method": {
+      "CASH": "Efectivo",
+      "TRANSFER": "Transferencia",
+      "BANK_TRANSFER": "Transferencia bancaria",
+      "CARD": "Tarjeta",
+      "CHECK": "Cheque",
+      "OTHER": "Otro",
+      "MANUAL": "Manual",
+      "QR": "QR"
+    },
+    "periods": {
+      "today": "Hoy",
+      "7d": "Últimos 7 días",
+      "30d": "Últimos 30 días",
+      "month": "Mes actual",
+      "previous_month": "Mes anterior",
+      "year": "Año actual",
+      "custom": "Período personalizado"
+    }
   },
   "settings": {
     "title": "Configuración del gimnasio",
+    "subtitle": "Gestiona {{gym}}, las reglas operativas y tu cuenta de administrador.",
     "sections": {
       "business": "Información del gimnasio",
-      "localization": "Idioma y región",
-      "hours": "Horarios",
       "operations": "Configuración operativa",
-      "appearance": "Personalización visual",
-      "profile": "Preferencias personales"
+      "profile": "Perfil del administrador",
+      "localization": "Idioma y región"
     },
     "language": "Idioma",
     "defaultLanguage": "Idioma predeterminado del gimnasio",
+    "defaultLanguageHint": "Se usa cuando un usuario no tiene una preferencia personal. No modifica las preferencias ya guardadas.",
     "personalLanguage": "Idioma personal",
+    "personalLanguageHint": "Tu preferencia personal tiene prioridad sobre el idioma del gimnasio.",
     "timezone": "Zona horaria",
     "country": "País",
-    "currency": "Moneda"
+    "currency": "Moneda",
+    "locale": "Región para formatos de fecha y número",
+    "saveLocalization": "Guardar idioma y región",
+    "localizationSaved": "Idioma y región guardados. Los cambios se aplican a los usuarios sin preferencia personal.",
+    "localizationWarning": "Cambiar el idioma predeterminado afecta a todos los usuarios sin preferencia personal.",
+    "selectLanguage": "Selecciona un idioma"
+  },
+  "notifications": {
+    "title": "Notificaciones",
+    "subtitle": "Historial personal. Solo tú puedes ver y marcar como leídas estas notificaciones.",
+    "markAll": "Marcar todas como leídas",
+    "type": "Tipo",
+    "status": "Estado",
+    "allTypes": "Todos los tipos",
+    "allStatuses": "Todas",
+    "unread": "Sin leer",
+    "read": "Leídas",
+    "markRead": "Marcar leída",
+    "open": "Abrir",
+    "empty": "No hay notificaciones para estos filtros.",
+    "loading": "Cargando notificaciones…",
+    "loadError": "No se pudieron cargar las notificaciones",
+    "summary": "{{total}} notificaciones · {{unread}} sin leer",
+    "page": "Página {{page}} de {{total}}",
+    "readAt": "Leída {{date}}",
+    "types": {
+      "MEMBERSHIP_EXPIRING": "Membresía por vencer",
+      "MEMBERSHIP_EXPIRED": "Membresía vencida",
+      "MEMBERSHIP_RENEWED": "Membresía renovada",
+      "MEMBERSHIP_STATUS": "Cambio de membresía",
+      "ROUTINE_ASSIGNED": "Rutina asignada",
+      "ROUTINE_UPDATED": "Rutina actualizada",
+      "PAYMENT_REGISTERED": "Pago registrado",
+      "PAYMENT_VOIDED": "Pago anulado",
+      "PAYMENT_PENDING": "Saldo pendiente",
+      "ANNOUNCEMENT": "Aviso",
+      "GENERAL": "General",
+      "INSTRUCTOR_NOTICE": "Aviso a instructor"
+    }
+  },
+  "audit": {
+    "title": "Auditoría",
+    "subtitle": "Registro de solo lectura. Los valores sensibles se redactan al mostrarse.",
+    "platform": "PLATAFORMA",
+    "gymAdministration": "ADMINISTRACIÓN DEL GIMNASIO",
+    "search": "Buscar",
+    "searchPlaceholder": "Usuario, entidad o identificador",
+    "action": "Acción",
+    "allActions": "Todas",
+    "entity": "Entidad",
+    "from": "Desde",
+    "to": "Hasta",
+    "apply": "Aplicar filtros",
+    "clear": "Limpiar",
+    "summary": "{{total}} eventos · alcance {{scope}}",
+    "scopeGym": "del gimnasio",
+    "scopeGlobal": "global",
+    "date": "Fecha",
+    "actor": "Actor",
+    "result": "Resultado",
+    "detail": "Detalle",
+    "view": "Ver",
+    "hide": "Ocultar",
+    "oldValues": "Valores anteriores",
+    "newValues": "Valores nuevos",
+    "noEvents": "No hay eventos que coincidan con los filtros.",
+    "loadError": "No se pudo consultar la auditoría",
+    "loading": "Cargando eventos…",
+    "systemActor": "Sistema / eliminado",
+    "page": "Página {{page}} de {{total}}",
+    "gym": "Gimnasio",
+    "actions": {
+      "CREATE": "Creación",
+      "UPDATE": "Modificación",
+      "DELETE": "Eliminación",
+      "RESTORE": "Restauración",
+      "LOGIN": "Inicio de sesión",
+      "LOGOUT": "Cierre de sesión",
+      "EXPORT": "Exportación",
+      "IMPORT": "Importación",
+      "ASSIGN": "Asignación",
+      "UNASSIGN": "Desasignación",
+      "PAYMENT_REGISTERED": "Pago registrado",
+      "ATTENDANCE_MARKED": "Asistencia registrada",
+      "ROUTINE_ASSIGNED": "Rutina asignada"
+    }
+  },
+  "dashboard": {
+    "adminLabel": "ADMINISTRACIÓN DEL GIMNASIO",
+    "loading": "Cargando el dashboard de tu gimnasio…",
+    "loadError": "El dashboard no está disponible",
+    "gymSettings": "Configuración del gimnasio",
+    "modulesTitle": "Módulos del gimnasio",
+    "modulesHint": "Cada herramienta abre su sección real y usa los datos registrados.",
+    "paymentsDisclaimer": "Los pagos son registros administrativos; no hay cobros en línea habilitados.",
+    "cards": {
+      "activeMembers": "Socios activos",
+      "registeredHint": "{{total}} socios registrados",
+      "activeMemberships": "Membresías vigentes",
+      "expiringHint": "{{count}} próximas a vencer",
+      "todayAttendance": "Asistencias de hoy",
+      "monthHint": "{{count}} en el mes",
+      "monthRevenue": "Ingresos del mes",
+      "excludingVoided": "Sin pagos anulados",
+      "pendingDebt": "Deudas pendientes",
+      "calculatedBalance": "Saldo calculado"
+    },
+    "modules": {
+      "gymInfo": {
+        "title": "Información del gimnasio",
+        "description": "Datos comerciales, ubicación, logotipo y moneda."
+      },
+      "members": {
+        "title": "Socios",
+        "description": "Directorio de socios y asignaciones."
+      },
+      "instructors": {
+        "title": "Instructores",
+        "description": "Cuentas de instructores y socios asignados."
+      },
+      "plans": {
+        "title": "Planes de membresía",
+        "description": "Precios, duraciones y condiciones por gimnasio."
+      },
+      "subscriptions": {
+        "title": "Membresías",
+        "description": "Altas, renovaciones, historial y vencimientos."
+      },
+      "payments": {
+        "title": "Pagos",
+        "description": "Registros administrativos de pagos recibidos fuera de la plataforma."
+      },
+      "receivables": {
+        "title": "Cuentas por cobrar",
+        "description": "Obligaciones, pagos parciales y deudas vencidas."
+      },
+      "cash": {
+        "title": "Caja",
+        "description": "Sesiones diarias, apertura y cierre."
+      },
+      "attendance": {
+        "title": "Asistencia",
+        "description": "Registro manual y QR, reglas de acceso e historial."
+      },
+      "routines": {
+        "title": "Rutinas",
+        "description": "Constructor, asignaciones, versiones e historial."
+      },
+      "reports": {
+        "title": "Reportes",
+        "description": "Métricas reales, gráficos y exportaciones PDF/Excel."
+      },
+      "settings": {
+        "title": "Configuración y perfil",
+        "description": "Preferencias operativas y cuenta del administrador."
+      }
+    }
   }
 }

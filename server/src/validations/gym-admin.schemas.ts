@@ -59,6 +59,17 @@ export const gymPreferencesSchema = z.object({
   }).default({ requireActiveMember: true, requireValidMembership: true, allowAdministrativeExceptions: true }),
 }).strict();
 
+export const gymLocalizationSchema = z
+  .object({
+    language: z.enum(['es', 'en', 'pt']).optional(),
+    locale: z.string().trim().regex(/^[a-z]{2}(-[A-Z]{2})?$/, 'Use a locale such as es-AR').optional(),
+    country: optionalText(80),
+    timezone: timezoneSchema.optional(),
+    currency: currencySchema.optional(),
+  })
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, 'At least one field is required');
+
 export const profileUpdateSchema = z.object({
   fullName: z.string().trim().min(2).max(120).optional(),
   phone: optionalText(40),

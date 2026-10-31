@@ -1,98 +1,127 @@
-import { memo, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
-  BarChart,
-  Bar,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
   Area,
   AreaChart,
-  ComposedChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from 'recharts';
 import { Calendar, FileSpreadsheet, FileText, RefreshCw, Users } from 'lucide-react';
 
 import { Button } from '../components/ui/Button';
 import { ErrorState, LoadingState } from '../components/ui/states';
 import { api, apiErrorMessage } from '../lib/api';
+import { useAuth } from '../lib/auth';
+import { downloadReport, type ExportReport } from '../lib/dashboard';
+import { formatCurrency, formatDate, formatNumber, resolveLocale } from '../lib/format';
 import { cn } from '../lib/utils';
-
-function formatCurrencyForDisplay(value: number) {
-  try {
-    return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 }).format(value || 0);
-  } catch {
-    return `$${(value || 0).toLocaleString('es-ES')}`;
-  }
-}
-
-function formatDateForDisplay(value: string | Date) {
-  try {
-    const d = typeof value === 'string' ? new Date(value) : value;
-    return d.toLocaleDateString('es-ES');
-  } catch {
-    return String(value);
-  }
-}
 
 type Period = 'today' | '7d' | '30d' | 'month' | 'previous_month' | 'year' | 'custom';
 
 type OverviewData = {
-  cards: Record<string, { label: string; value: number | string; sublabel?: string; tone?: string }>;
-  gym: { id: string; name: string };
+  gym: { id: string; name: string; logoUrl: string | null };
+  period: { label: string; from: string; to: string };
+  members: { total: number; active: number; inactive: number };
+  memberships: { active: number; expired: number; pending: number; frozen: number; expiringSoon: number };
+  attendance: { today: number; thisMonth: number };
+  revenue: { currency: string; collectedThisMonth: number; collectedThisMonthCount: number; pendingObligations: number };
 };
 
-type AttendanceSeries = { date: string; count: number };
 type AttendanceData = {
-  series: AttendanceSeries[];
-  peak: { day?: string | null; hour?: number | null; count?: number };
+  series: Array<{ date: string; count: number }>;
+  byMethod: Array<{ method: string; count: number }>;
+  peak: { day?: string | null; hour?: number | null; count?: number } | null;
+  comparison: { previousTotal: number; changePct: number | null };
+  total: number;
   period: { from: string; to: string };
 };
 
-type RevenueSeries = { month: string; total: number; count: number };
-type RevenueMethod = { method: string; total: number; count: number };
 type RevenueData = {
-  series: RevenueSeries[];
-  byMethod: RevenueMethod[];
-  totals: { total: number; count: number };
+  series: Array<{ month: string; total: number; count: number }>;
+  byMethod: Array<{ method: string; total: number; count: number }>;
+  comparison: { previousTotal: number; changePct: number | null };
+  totals?: { total: number; count: number };
+  total: number;
+  count: number;
   period: { from: string; to: string };
 };
 
 type MembershipsData = {
   distribution: Array<{ status: string; count: number }>;
-  expiringSoon: Array<{ memberId: string; memberName: string; endDate: string | null; status: string }>;
+  distributionTotal: number;
+  expiringSoon: Array<{ memberId: string; memberName: string; endDate: string; status: string }>;
   newMembers: Array<{ month: string; count: number }>;
   renewals: Array<{ month: string; count: number }>;
+  expiringSoonCount: number;
   period: { from: string; to: string };
 };
 
-const PERIOD_OPTIONS: Array<{ value: Period; label: string }> = [
-  { value: 'today', label: 'Hoy' },
-  { value: '7d', label: 'Últimos 7 días' },
-  { value: '30d', label: 'Últimos 30 días' },
-  { value: 'month', label: 'Mes actual' },
-  { value: 'previous_month', label: 'Mes anterior' },
-  { value: 'year', label: 'Año actual' },
-  { value: 'custom', label: 'Período personalizado' },
-];
+const PERIOD_OPTIONS: Period[] = ['today', '7d', '30d', 'month', 'previous_month', 'year', 'custom'];
 
 const COLORS = ['#2563eb', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
-function formatNumber(n: number | string | undefined | null) {
-  if (n === undefined || n === null) return '0';
-  const num = typeof n === 'string' ? Number(n) : n;
-  if (Number.isNaN(num)) return String(n);
-  return num.toLocaleString('es-ES');
+function formatMonth(value: string, locale: string) {
+  if (!value) return '—';
+  const date = new Date(`${value}-01T12:00:00`);
+  return Number.isNaN(date.getTime())
+    ? value
+    : new Intl.DateTimeFormat(locale, { month: 'short', year: '2-digit' }).format(date);
+}
+
+function PurchaseOption({ label, onClick }: { label: string; onClick: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <button type="button" className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-left text-sm hover:bg-muted focus:border-primary" onClick={onClick}>
+      {label}
+    </button>
+  );
+}
+
+function ChartCard({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
+      <header className="mb-4">
+        <h2 className="text-lg font-semibold">{title}</h2>
+        {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
+      </header>
+      {children}
+    </section>
+  );
+}
+
+function EmptyChart() {
+  const { t } = useTranslation();
+  return <div className="flex h-[280px] items-center justify-center text-sm text-muted-foreground">{t('reports.charts.noData')}</div>;
+}
+
+function Change({ value, locale }: { value: number | null; locale: string }) {
+  const { t } = useTranslation();
+  if (value === null) return <span className="text-xs text-muted-foreground">{t('reports.charts.noComparison')}</span>;
+  const formatted = new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value);
+  return (
+    <span className={cn('text-xs font-medium', value >= 0 ? 'text-emerald-600' : 'text-destructive')}>
+      {t('reports.charts.comparison', { value: `${value >= 0 ? '+' : ''}${formatted}` })}
+    </span>
+  );
 }
 
 const GymReportsPage = memo(function GymReportsPage() {
+  const { t } = useTranslation();
+  const { language, locale } = useAuth();
+  const formatLocale = resolveLocale(language, locale);
   const [period, setPeriod] = useState<Period>('month');
+  const [exportReportType, setExportReportType] = useState<ExportReport>('members');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [overview, setOverview] = useState<OverviewData | null>(null);
@@ -100,302 +129,334 @@ const GymReportsPage = memo(function GymReportsPage() {
   const [revenue, setRevenue] = useState<RevenueData | null>(null);
   const [memberships, setMemberships] = useState<MembershipsData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const [exportError, setExportError] = useState('');
+  const [exporting, setExporting] = useState<'pdf' | 'xlsx' | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setError('');
     try {
-      const params = new URLSearchParams();
-      params.set('period', period);
+      const params = new URLSearchParams({ period });
       if (period === 'custom') {
-        if (from) params.set('from', from);
-        if (to) params.set('to', to);
+        if (!from || !to) throw new Error(t('reports.dateError'));
+        if (from > to) throw new Error(t('reports.dateOrderError'));
+        params.set('from', from);
+        params.set('to', to);
       }
-      const q = params.toString();
-      const [ov, att, rev, mem] = await Promise.all([
-        api<OverviewData>(`/dashboard/overview?${q}`),
-        api<AttendanceData>(`/dashboard/attendance?${q}`),
-        api<RevenueData>(`/dashboard/revenue?${q}`),
-        api<MembershipsData>(`/dashboard/memberships?${q}`),
+      const query = params.toString();
+      const [overviewResult, attendanceResult, revenueResult, membershipsResult] = await Promise.all([
+        api<{ data: OverviewData }>(`/dashboard/overview?${query}`),
+        api<{ data: AttendanceData }>(`/dashboard/attendance?${query}`),
+        api<{ data: RevenueData }>(`/dashboard/revenue?${query}`),
+        api<{ data: MembershipsData }>(`/dashboard/memberships?${query}`),
       ]);
-      setOverview(ov);
-      setAttendance(att);
-      setRevenue(rev);
-      setMemberships(mem);
-    } catch (err) {
-      const msg = apiErrorMessage(err);
-      setError(msg || 'Error al cargar dashboard');
-      if ((err as any)?.status === 401) {
-        window.location.href = '/login';
-      }
+      setOverview(overviewResult.data);
+      setAttendance(attendanceResult.data);
+      setRevenue(revenueResult.data);
+      setMemberships(membershipsResult.data);
+    } catch (cause) {
+      setError(apiErrorMessage(cause));
+      setOverview(null);
+      setAttendance(null);
+      setRevenue(null);
+      setMemberships(null);
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period, from, to]);
 
-  const cards = overview?.cards ? Object.values(overview.cards) : [];
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-  if (loading && !overview) {
-    return <LoadingState label="Cargando dashboard" />;
-  }
+  const exportFile = async (format: 'pdf' | 'xlsx') => {
+    setExportError('');
+    setExporting(format);
+    try {
+      await downloadReport(exportReportType, format, {
+        period,
+        from: period === 'custom' ? from : undefined,
+        to: period === 'custom' ? to : undefined,
+      });
+    } catch (cause) {
+      setExportError(apiErrorMessage(cause));
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  const currency = overview?.revenue.currency ?? 'USD';
+  const formatMoney = (value: number) => formatCurrency(value, currency, formatLocale);
+  const formatCount = (value: number | string | undefined | null) => formatNumber(value, formatLocale);
+
+  const cards = overview
+    ? [
+        { label: t('reports.cards.totalMembers'), value: formatCount(overview.members.total), hint: t('reports.currentValue') },
+        { label: t('reports.cards.activeMembers'), value: formatCount(overview.members.active), hint: t('reports.currentValue') },
+        { label: t('reports.cards.inactiveMembers'), value: formatCount(overview.members.inactive), hint: t('reports.currentValue') },
+        { label: t('reports.cards.activeMemberships'), value: formatCount(overview.memberships.active), hint: t('reports.currentValue') },
+        { label: t('reports.cards.expiringSoon'), value: formatCount(overview.memberships.expiringSoon), hint: t('reports.sevenDayWindow') },
+        { label: t('reports.cards.expiredMemberships'), value: formatCount(overview.memberships.expired), hint: t('reports.currentValue') },
+        { label: t('reports.cards.todayAttendance'), value: formatCount(overview.attendance.today), hint: t('reports.today') },
+        { label: t('reports.cards.monthAttendance'), value: formatCount(overview.attendance.thisMonth), hint: t('reports.currentMonth') },
+        { label: t('reports.cards.monthRevenue'), value: formatMoney(overview.revenue.collectedThisMonth), hint: t('reports.excludingVoided') },
+        { label: t('reports.cards.pendingDebt'), value: formatMoney(overview.revenue.pendingObligations), hint: t('reports.calculatedBalance') },
+      ]
+    : [];
+
+  if (loading && !overview) return <LoadingState label={t('app.loading')} />;
 
   return (
     <div className="space-y-6">
       <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Dashboard y reportes</h1>
-          <p className="text-sm text-slate-500">Métricas reales basadas en la base de datos</p>
+          <h1 className="text-2xl font-bold tracking-tight">{t('reports.title')}</h1>
+          <p className="text-sm text-muted-foreground">
+            {t('reports.subtitle', { gym: overview?.gym.name ?? '', from: overview?.period.from ?? '', to: overview?.period.to ?? '' })}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-1">
-            <Calendar className="h-4 w-4 text-slate-400" />
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-2 py-1">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
             <select
               value={period}
-              onChange={(e) => setPeriod(e.target.value as Period)}
-              className="text-sm text-slate-700 focus:outline-none"
+              onChange={(event) => setPeriod(event.target.value as Period)}
+              className="bg-transparent text-sm focus:outline-none"
+              aria-label={t('reports.period')}
             >
-              {PERIOD_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
+              {PERIOD_OPTIONS.map((option) => (
+                <option key={option} value={option}>{t(`reports.periods.${option}`)}</option>
               ))}
             </select>
           </div>
           {period === 'custom' && (
             <>
-              <input
-                type="date"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-                className="rounded-lg border border-slate-200 px-2 py-1 text-sm"
-              />
-              <input
-                type="date"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-                className="rounded-lg border border-slate-200 px-2 py-1 text-sm"
-              />
+              <input type="date" value={from} onChange={(event) => setFrom(event.target.value)} className="input w-auto" aria-label={t('reports.customFrom')} />
+              <input type="date" value={to} onChange={(event) => setTo(event.target.value)} className="input w-auto" aria-label={t('reports.customTo')} />
             </>
           )}
-          <Button variant="ghost" onClick={load} disabled={loading}>
-            <RefreshCw className={cn('mr-2 h-4 w-4', loading && 'animate-spin')} />
-            Actualizar
+          <Button variant="ghost" onClick={() => void load()} disabled={loading}>
+            <RefreshCw className={cn('mr-2 h-4 w-4', loading && 'animate-spin')} /> {t('reports.refresh')}
+          </Button>
+          <label className="flex items-center gap-2 rounded-lg border border-border bg-card px-2 py-1 text-sm">
+            <span className="sr-only">{t('reports.exportReport')}</span>
+            <select
+              value={exportReportType}
+              onChange={(event) => setExportReportType(event.target.value as ExportReport)}
+              aria-label={t('reports.exportReport')}
+              className="bg-transparent text-sm focus:outline-none"
+            >
+              <option value="members">{t('reports.reportTypes.members')}</option>
+              <option value="attendance">{t('reports.reportTypes.attendance')}</option>
+              <option value="financial">{t('reports.reportTypes.financial')}</option>
+            </select>
+          </label>
+          <Button variant="outline" onClick={() => void exportFile('pdf')} loading={exporting === 'pdf'}>
+            <FileText className="mr-2 h-4 w-4" /> PDF
+          </Button>
+          <Button variant="outline" onClick={() => void exportFile('xlsx')} loading={exporting === 'xlsx'}>
+            <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
           </Button>
         </div>
       </header>
 
-      {error && <ErrorState title="Error" message={error} />}
+      {error && <ErrorState title={t('reports.loadError')} message={error} onRetry={() => void load()} />}
+      {exportError && <ErrorState title={t('reports.exportError')} message={exportError} />}
+
+      <p className="text-xs text-muted-foreground">{t('reports.currentValueNote')}</p>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {cards.map((card) => (
-          <div key={card.label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-sm text-slate-500">{card.label}</p>
-            <p className="mt-2 text-2xl font-semibold text-slate-900">{formatNumber(card.value)}</p>
-            {card.sublabel && <p className="mt-1 text-xs text-slate-400">{card.sublabel}</p>}
+          <div key={card.label} className="rounded-xl border border-border bg-card p-4 shadow-sm">
+            <p className="text-sm text-muted-foreground">{card.label}</p>
+            <p className="mt-2 text-2xl font-semibold">{card.value}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{card.hint}</p>
           </div>
         ))}
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <header className="mb-4 flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">Asistencias por día</h2>
-              <p className="text-sm text-slate-500">Valores reales del período</p>
-            </div>
-          </header>
-          {attendance?.series && attendance.series.length > 0 ? (
+      <div className="grid gap-6 lg:grid-cols-2">
+        <ChartCard title={t('reports.charts.attendanceByDay')} subtitle={t('reports.charts.attendanceByDaySubtitle')}>
+          {attendance && attendance.series.length > 0 ? (
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={attendance.series}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
+                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                 <YAxis allowDecimals={false} />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="count" name="Asistencias" fill="#2563eb" />
+                <Bar dataKey="count" name={t('reports.charts.attendanceByDay')} fill="#2563eb" />
               </BarChart>
             </ResponsiveContainer>
-          ) : (
-            <div className="flex h-[280px] items-center justify-center text-sm text-slate-400">Sin datos</div>
-          )}
-          {attendance?.peak && (attendance.peak.day || attendance.peak.hour !== undefined) && (
-            <p className="mt-2 text-xs text-slate-500">
-              Mayor concurrencia: {attendance.peak.day || '-'} {attendance.peak.hour !== undefined && attendance.peak.hour !== null ? `a las ${attendance.peak.hour}:00` : ''} ({attendance.peak.count || 0})
-            </p>
-          )}
-        </div>
+          ) : <EmptyChart />}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+            <span>{t('reports.charts.total')}: {formatNumber(attendance?.total)}</span>
+            <Change value={attendance?.comparison.changePct ?? null} />
+            <span>
+              {t('reports.charts.peak')}:{' '}
+              {attendance?.peak
+                ? `${formatDate(attendance.peak.day ?? '')}${attendance.peak.hour !== null && attendance.peak.hour !== undefined ? ` · ${String(attendance.peak.hour).padStart(2, '0')}:00` : ''}`
+                : t('reports.charts.notEnoughData')}
+            </span>
+          </div>
+        </ChartCard>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <header className="mb-4 flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">Ingresos registrados por mes</h2>
-              <p className="text-sm text-slate-500">Solo pagos no anulados</p>
-            </div>
-          </header>
-          {revenue?.series && revenue.series.length > 0 ? (
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={revenue.series}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip formatter={(value: any) => formatCurrencyForDisplay(Number(value))} />
-                <Legend />
-                <Line type="monotone" dataKey="total" name="Ingresos" stroke="#22c55e" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex h-[280px] items-center justify-center text-sm text-slate-400">Sin datos</div>
-          )}
-        </div>
-      </section>
-
-      <section className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <header className="mb-4">
-            <h2 className="text-lg font-semibold text-slate-900">Distribución por método de pago</h2>
-            <p className="text-sm text-slate-500">Ingresos válidos</p>
-          </header>
-          {revenue?.byMethod && revenue.byMethod.length > 0 ? (
+        <ChartCard title={t('reports.charts.attendanceByMethod')} subtitle={t('reports.charts.attendanceByMethodSubtitle')}>
+          {attendance && attendance.byMethod.length > 0 ? (
             <ResponsiveContainer width="100%" height={280}>
               <PieChart>
                 <Pie
-                  data={revenue.byMethod}
-                  dataKey="total"
-                  nameKey="method"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={90}
-                  label={(entry: any) => entry.method}
+                  data={attendance.byMethod.map((row) => ({ name: t(`reports.method.${row.method}`, { defaultValue: row.method }), value: row.count }))}
+                  dataKey="value"
+                  nameKey="name"
+                  outerRadius={100}
+                  label
                 >
-                  {revenue.byMethod.map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
+                  {attendance.byMethod.map((row, index) => <Cell key={row.method} fill={COLORS[index % COLORS.length]} />)}
                 </Pie>
-                <Tooltip formatter={(value: any) => formatCurrencyForDisplay(Number(value))} />
+                <Tooltip />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
-          ) : (
-            <div className="flex h-[280px] items-center justify-center text-sm text-slate-400">Sin datos</div>
-          )}
-        </div>
+          ) : <EmptyChart />}
+        </ChartCard>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <header className="mb-4">
-            <h2 className="text-lg font-semibold text-slate-900">Membresías</h2>
-            <p className="text-sm text-slate-500">Estado actual</p>
-          </header>
-          {memberships?.distribution && memberships.distribution.length > 0 ? (
+        <ChartCard title={t('reports.charts.revenueByMonth')} subtitle={t('reports.charts.revenueByMonthSubtitle')}>
+          {revenue && revenue.series.length > 0 ? (
             <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={memberships.distribution}>
+              <LineChart data={revenue.series}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="status" />
-                <YAxis allowDecimals={false} />
+                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                <YAxis />
+                <Tooltip formatter={(value) => formatMoney(Number(value))} />
+                <Legend />
+                <Line type="monotone" dataKey="total" name={t('reports.cards.monthRevenue')} stroke="#22c55e" strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : <EmptyChart />}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+            <span>{t('reports.charts.total')}: {formatMoney(revenue?.total ?? 0)} ({t('reports.charts.totalPagos', { total: formatNumber(revenue?.count) })})</span>
+            <Change value={revenue?.comparison.changePct ?? null} />
+          </div>
+        </ChartCard>
+
+        <ChartCard title={t('reports.charts.revenueByMethod')} subtitle={t('reports.charts.revenueByMethodSubtitle')}>
+          {revenue && revenue.byMethod.length > 0 ? (
+            <ResponsiveContainer width="100%" height={280}>
+              <PieChart>
+                <Pie
+                  data={revenue.byMethod.map((row) => ({ name: t(`reports.method.${row.method}`, { defaultValue: row.method }), value: row.total }))}
+                  dataKey="value"
+                  nameKey="name"
+                  outerRadius={100}
+                  label
+                >
+                  {revenue.byMethod.map((row, index) => <Cell key={row.method} fill={COLORS[index % COLORS.length]} />)}
+                </Pie>
+                <Tooltip formatter={(value) => formatMoney(Number(value))} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : <EmptyChart />}
+        </ChartCard>
+
+        <ChartCard title={t('reports.charts.membershipStatus')} subtitle={t('reports.charts.membershipStatusSubtitle')}>
+          {memberships && memberships.distribution.length > 0 ? (
+            <ResponsiveContainer width="100%" height={280}>
+              <PieChart>
+                <Pie
+                  data={memberships.distribution.map((row) => ({ name: t(`reports.status.${row.status}`, { defaultValue: row.status }), value: row.count }))}
+                  dataKey="value"
+                  nameKey="name"
+                  outerRadius={100}
+                  label
+                >
+                  {memberships.distribution.map((row, index) => <Cell key={row.status} fill={COLORS[index % COLORS.length]} />)}
+                </Pie>
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="count" name="Cantidad" fill="#f59e0b" />
-              </BarChart>
+              </PieChart>
             </ResponsiveContainer>
-          ) : (
-            <div className="flex h-[280px] items-center justify-center text-sm text-slate-400">Sin datos</div>
-          )}
-        </div>
-      </section>
+          ) : <EmptyChart />}
+        </ChartCard>
 
-      <section className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <header className="mb-4">
-            <h2 className="text-lg font-semibold text-slate-900">Nuevas altas de socios</h2>
-            <p className="text-sm text-slate-500">Por período</p>
-          </header>
-          {memberships?.newMembers && memberships.newMembers.length > 0 ? (
+        <ChartCard title={t('reports.charts.newMembers')} subtitle={t('reports.charts.newMembersSubtitle')}>
+          {memberships && memberships.newMembers.length > 0 ? (
             <ResponsiveContainer width="100%" height={280}>
               <AreaChart data={memberships.newMembers}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
+                <XAxis dataKey="month" tickFormatter={formatMonth} tick={{ fontSize: 11 }} />
                 <YAxis allowDecimals={false} />
-                <Tooltip />
+                <Tooltip labelFormatter={(label) => formatMonth(String(label ?? ''))} />
                 <Legend />
-                <Area type="monotone" dataKey="count" name="Nuevos socios" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.2} />
+                <Area type="monotone" dataKey="count" name={t('reports.charts.newMembers')} stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.2} />
               </AreaChart>
             </ResponsiveContainer>
-          ) : (
-            <div className="flex h-[280px] items-center justify-center text-sm text-slate-400">Sin datos</div>
-          )}
-        </div>
+          ) : <EmptyChart />}
+        </ChartCard>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <header className="mb-4">
-            <h2 className="text-lg font-semibold text-slate-900">Renovaciones registradas</h2>
-            <p className="text-sm text-slate-500">Por período</p>
-          </header>
-          {memberships?.renewals && memberships.renewals.length > 0 ? (
+        <ChartCard title={t('reports.charts.renewals')} subtitle={t('reports.charts.renewalsSubtitle')}>
+          {memberships && memberships.renewals.length > 0 ? (
             <ResponsiveContainer width="100%" height={280}>
-              <ComposedChart data={memberships.renewals}>
+              <BarChart data={memberships.renewals}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
+                <XAxis dataKey="month" tickFormatter={formatMonth} tick={{ fontSize: 11 }} />
                 <YAxis allowDecimals={false} />
-                <Tooltip />
+                <Tooltip labelFormatter={(label) => formatMonth(String(label ?? ''))} />
                 <Legend />
-                <Bar dataKey="count" name="Renovaciones" fill="#06b6d4" />
-              </ComposedChart>
+                <Bar dataKey="count" name={t('reports.charts.renewals')} fill="#06b6d4" />
+              </BarChart>
             </ResponsiveContainer>
-          ) : (
-            <div className="flex h-[280px] items-center justify-center text-sm text-slate-400">Sin datos</div>
-          )}
-        </div>
-      </section>
+          ) : <EmptyChart />}
+        </ChartCard>
 
-      <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <header className="flex flex-col gap-2 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <ChartCard title={t('reports.charts.peakHours')} subtitle={t('reports.charts.peakHoursSubtitle')}>
+          {attendance && attendance.peak ? (
+            <div className="flex h-[280px] flex-col justify-center gap-3 text-sm">
+              <p className="text-3xl font-semibold">{String(attendance.peak.hour ?? 0).padStart(2, '0')}:00</p>
+              <p className="text-muted-foreground">
+                {t('reports.charts.peakSummary', { value: formatNumber(attendance.peak.count), day: attendance.peak.day ? formatDate(attendance.peak.day) : '—' })}
+              </p>
+              <p className="text-xs text-muted-foreground">{t('reports.charts.peakDataSource')}</p>
+            </div>
+          ) : <EmptyChart />}
+        </ChartCard>
+      </div>
+
+      <section className="rounded-xl border border-border bg-card shadow-sm">
+        <header className="flex flex-col gap-2 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Membresías próximas a vencer</h2>
-            <p className="text-sm text-slate-500">Vencimientos cercanos</p>
+            <h2 className="text-lg font-semibold">{t('reports.expiring.title')}</h2>
+            <p className="text-sm text-muted-foreground">{t('reports.expiring.subtitle')}</p>
           </div>
           <div className="flex gap-2">
             <Button variant="ghost" onClick={() => (window.location.href = '/gym/reports/members')}>
-              <Users className="mr-2 h-4 w-4" />
-              Ver reporte de socios
-            </Button>
-            <Button variant="ghost" onClick={() => (window.location.href = `/api/v1/reports/export?report=members&format=pdf&period=${period}`)}>
-              <FileText className="mr-2 h-4 w-4" />
-              PDF
-            </Button>
-            <Button variant="ghost" onClick={() => (window.location.href = `/api/v1/reports/export?report=members&format=xlsx&period=${period}`)}>
-              <FileSpreadsheet className="mr-2 h-4 w-4" />
-              Excel
+              <Users className="mr-2 h-4 w-4" /> {t('reports.expiring.viewMembersReport')}
             </Button>
           </div>
         </header>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-slate-50">
-                <th className="px-4 py-2 text-left font-medium text-slate-600">Socio</th>
-                <th className="px-4 py-2 text-left font-medium text-slate-600">Estado</th>
-                <th className="px-4 py-2 text-left font-medium text-slate-600">Vence</th>
+              <tr className="bg-muted/50 text-left">
+                <th className="px-4 py-2 font-medium">{t('reports.expiring.member')}</th>
+                <th className="px-4 py-2 font-medium">{t('reports.expiring.status')}</th>
+                <th className="px-4 py-2 font-medium">{t('reports.expiring.expires')}</th>
               </tr>
             </thead>
             <tbody>
-              {memberships?.expiringSoon && memberships.expiringSoon.length > 0 ? (
-                memberships.expiringSoon.map((m) => (
-                  <tr key={m.memberId} className="border-t border-slate-100">
-                    <td className="px-4 py-2 text-slate-900">{m.memberName}</td>
-                    <td className="px-4 py-2 text-slate-600">{m.status}</td>
-                    <td className="px-4 py-2 text-slate-600">{m.endDate ? formatDateForDisplay(m.endDate) : '-'}</td>
+              {memberships && memberships.expiringSoon.length > 0 ? (
+                memberships.expiringSoon.map((row) => (
+                  <tr key={row.memberId} className="border-t border-border">
+                    <td className="px-4 py-2">{row.memberName}</td>
+                    <td className="px-4 py-2">{t(`reports.status.${row.status}`, { defaultValue: row.status })}</td>
+                    <td className="px-4 py-2">{formatDate(row.endDate)}</td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={3} className="px-4 py-6 text-center text-slate-400">
-                    Sin membresías próximas a vencer
-                  </td>
+                  <td colSpan={3} className="px-4 py-6 text-center text-muted-foreground">{t('reports.expiring.empty')}</td>
                 </tr>
               )}
             </tbody>

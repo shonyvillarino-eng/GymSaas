@@ -18,46 +18,342 @@
     "no": "No",
     "error": "Error",
     "success": "Success",
-    "noData": "No data"
+    "noData": "No data",
+    "retry": "Try again",
+    "open": "Open",
+    "close": "Close",
+    "actions": "Actions",
+    "all": "All",
+    "none": "None",
+    "copy": "Copy",
+    "copied": "Copied",
+    "loadingSession": "Checking your session…"
   },
   "nav": {
+    "platform": "Platform",
+    "overview": "Overview",
+    "gyms": "Gyms",
+    "management": "Gym management",
+    "training": "Training",
+    "myGym": "My gym",
+    "myTraining": "My training",
+    "myAccount": "My account",
     "dashboard": "Dashboard",
+    "gymInfo": "Gym information",
     "members": "Members",
     "instructors": "Instructors",
-    "plans": "Plans",
-    "subscriptions": "Subscriptions",
+    "plans": "Membership plans",
+    "subscriptions": "Memberships",
     "payments": "Payments",
     "receivables": "Receivables",
-    "cash": "Cash",
+    "cash": "Cash register",
     "attendance": "Attendance",
-    "exercises": "Exercises",
     "routines": "Routines",
+    "exercises": "Exercise catalog",
     "reports": "Reports",
+    "announcements": "Announcements",
+    "audit": "Audit log",
+    "notifications": "Notifications",
     "settings": "Settings",
-    "profile": "Profile",
-    "logout": "Logout"
+    "myMembers": "My members",
+    "myProfile": "My profile",
+    "home": "Home",
+    "myRoutine": "My routine",
+    "myAttendances": "My attendances",
+    "myMembership": "My membership",
+    "myPayments": "My payments",
+    "notices": "Notices",
+    "logout": "Sign out",
+    "pending": "Pending",
+    "available": "Available"
   },
-  "auth": {
-    "login": "Login",
+  "topbar": {
+    "toggleSidebar": "Toggle sidebar",
+    "toggleTheme": "Toggle theme",
+    "welcome": "Welcome back, {{name}}",
+    "language": "Language",
+    "notifications": "Notifications",
+    "markAllRead": "Mark all",
+    "noNotifications": "You have no notifications.",
+    "viewHistory": "View full history",
+    "loading": "Loading…",
+    "unread": "{{count}} unread",
+    "personalLanguageHint": "Personal preference: it does not change the gym language."
+  },
+  "login": {
+    "checkingSession": "Checking your session…",
+    "subtitle": "Sign in to your account",
     "email": "Email",
     "password": "Password",
-    "signIn": "Sign in"
+    "signIn": "Sign in",
+    "signInError": "Unable to sign in. Try again.",
+    "invalidCredentials": "Invalid credentials."
+  },
+  "reports": {
+    "title": "Dashboard & reports",
+    "subtitle": "Real metrics for {{gym}} · {{from}} to {{to}}",
+    "period": "Period",
+    "customFrom": "Start date",
+    "customTo": "End date",
+    "dateError": "Select a start and end date.",
+    "dateOrderError": "The end date must be on or after the start date.",
+    "refresh": "Refresh",
+    "loadError": "The dashboard could not be loaded",
+    "exportError": "The report could not be exported",
+    "currentValueNote": "Indicators marked “Current value” reflect today's state and do not change with the selected period. Income excludes voided payments.",
+    "currentValue": "Current value",
+    "sevenDayWindow": "7-day window",
+    "today": "Today",
+    "currentMonth": "Current month",
+    "excludingVoided": "Excluding voided payments",
+    "calculatedBalance": "Calculated balance",
+    "cards": {
+      "totalMembers": "Registered members",
+      "activeMembers": "Active members",
+      "inactiveMembers": "Inactive or suspended",
+      "activeMemberships": "Current memberships",
+      "expiringSoon": "Expiring soon",
+      "expiredMemberships": "Expired memberships",
+      "todayAttendance": "Check-ins today",
+      "monthAttendance": "Check-ins this month",
+      "monthRevenue": "Income recorded this month",
+      "pendingDebt": "Outstanding debt"
+    },
+    "charts": {
+      "attendanceByDay": "Attendance by day",
+      "attendanceByDaySubtitle": "Records for the selected period",
+      "attendanceByMethod": "Attendance by method",
+      "attendanceByMethodSubtitle": "Manual and QR in the period",
+      "revenueByMonth": "Income recorded by month",
+      "revenueByMonthSubtitle": "Non-voided payments",
+      "revenueByMethod": "Distribution by payment method",
+      "revenueByMethodSubtitle": "Valid income only",
+      "membershipStatus": "Current membership status",
+      "membershipStatusSubtitle": "Current value, independent from the period",
+      "newMembers": "New member registrations",
+      "newMembersSubtitle": "Per month in the period",
+      "renewals": "Recorded renewals",
+      "renewalsSubtitle": "Registrations with a previous membership",
+      "peakHours": "Attendance by hour",
+      "peakHoursSubtitle": "Peak concurrency in the period",
+      "noData": "No data for the period",
+      "total": "Total",
+      "totalPagos": "{{total}} payments",
+      "peak": "Peak concurrency",
+      "notEnoughData": "Not enough data",
+      "peakSummary": "{{value}} check-ins on the busiest day ({{day}}).",
+      "peakDataSource": "Calculated only from records in the period.",
+      "noComparison": "No comparable previous period",
+      "comparison": "{{value}}% vs. previous period"
+    },
+    "expiring": {
+      "title": "Memberships expiring soon",
+      "subtitle": "Expirations within the configured window",
+      "member": "Member",
+      "status": "Status",
+      "expires": "Expires",
+      "empty": "No memberships expiring soon",
+      "viewMembersReport": "View member report"
+    },
+    "status": {
+      "ACTIVE": "Current",
+      "EXPIRED": "Expired",
+      "CANCELLED": "Cancelled",
+      "PENDING": "Pending",
+      "FROZEN": "Frozen"
+    },
+    "method": {
+      "CASH": "Cash",
+      "TRANSFER": "Transfer",
+      "BANK_TRANSFER": "Bank transfer",
+      "CARD": "Card",
+      "CHECK": "Check",
+      "OTHER": "Other",
+      "MANUAL": "Manual",
+      "QR": "QR"
+    },
+    "periods": {
+      "today": "Today",
+      "7d": "Last 7 days",
+      "30d": "Last 30 days",
+      "month": "Current month",
+      "previous_month": "Previous month",
+      "year": "Current year",
+      "custom": "Custom period"
+    }
   },
   "settings": {
-    "title": "Gym Settings",
+    "title": "Gym settings",
+    "subtitle": "Manage {{gym}}, operating rules and your administrator account.",
     "sections": {
-      "business": "Business Information",
-      "localization": "Language & Region",
-      "hours": "Business Hours",
-      "operations": "Operational Settings",
-      "appearance": "Appearance",
-      "profile": "Personal Preferences"
+      "business": "Business information",
+      "operations": "Operating preferences",
+      "profile": "Administrator profile",
+      "localization": "Language & region"
     },
     "language": "Language",
     "defaultLanguage": "Default gym language",
+    "defaultLanguageHint": "Used when a user has no personal preference. It does not overwrite preferences already saved.",
     "personalLanguage": "Personal language",
+    "personalLanguageHint": "Your personal preference takes priority over the gym language.",
     "timezone": "Timezone",
     "country": "Country",
-    "currency": "Currency"
+    "currency": "Currency",
+    "locale": "Region for date and number formats",
+    "saveLocalization": "Save language & region",
+    "localizationSaved": "Language and region saved. Changes apply to users without a personal preference.",
+    "localizationWarning": "Changing the default language affects every user without a personal preference.",
+    "selectLanguage": "Select a language"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "subtitle": "Personal history. Only you can see and mark these notifications as read.",
+    "markAll": "Mark all as read",
+    "type": "Type",
+    "status": "Status",
+    "allTypes": "All types",
+    "allStatuses": "All",
+    "unread": "Unread",
+    "read": "Read",
+    "markRead": "Mark read",
+    "open": "Open",
+    "empty": "No notifications match these filters.",
+    "loading": "Loading notifications…",
+    "loadError": "Notifications could not be loaded",
+    "summary": "{{total}} notifications · {{unread}} unread",
+    "page": "Page {{page}} of {{total}}",
+    "readAt": "Read {{date}}",
+    "types": {
+      "MEMBERSHIP_EXPIRING": "Membership expiring",
+      "MEMBERSHIP_EXPIRED": "Membership expired",
+      "MEMBERSHIP_RENEWED": "Membership renewed",
+      "MEMBERSHIP_STATUS": "Membership status change",
+      "ROUTINE_ASSIGNED": "Routine assigned",
+      "ROUTINE_UPDATED": "Routine updated",
+      "PAYMENT_REGISTERED": "Payment recorded",
+      "PAYMENT_VOIDED": "Payment voided",
+      "PAYMENT_PENDING": "Outstanding balance",
+      "ANNOUNCEMENT": "Announcement",
+      "GENERAL": "General",
+      "INSTRUCTOR_NOTICE": "Instructor notice"
+    }
+  },
+  "audit": {
+    "title": "Audit log",
+    "subtitle": "Read-only trail. Sensitive values are redacted when displayed.",
+    "platform": "PLATFORM",
+    "gymAdministration": "GYM ADMINISTRATION",
+    "search": "Search",
+    "searchPlaceholder": "User, entity or identifier",
+    "action": "Action",
+    "allActions": "All",
+    "entity": "Entity",
+    "from": "From",
+    "to": "To",
+    "apply": "Apply filters",
+    "clear": "Clear",
+    "summary": "{{total}} events · scope {{scope}}",
+    "scopeGym": "gym",
+    "scopeGlobal": "global",
+    "date": "Date",
+    "actor": "Actor",
+    "result": "Result",
+    "detail": "Detail",
+    "view": "View",
+    "hide": "Hide",
+    "oldValues": "Previous values",
+    "newValues": "New values",
+    "noEvents": "No events match the filters.",
+    "loadError": "The audit log could not be queried",
+    "loading": "Loading events…",
+    "systemActor": "System / deleted",
+    "page": "Page {{page}} of {{total}}",
+    "gym": "Gym",
+    "actions": {
+      "CREATE": "Create",
+      "UPDATE": "Update",
+      "DELETE": "Delete",
+      "RESTORE": "Restore",
+      "LOGIN": "Sign in",
+      "LOGOUT": "Sign out",
+      "EXPORT": "Export",
+      "IMPORT": "Import",
+      "ASSIGN": "Assignment",
+      "UNASSIGN": "Unassignment",
+      "PAYMENT_REGISTERED": "Payment recorded",
+      "ATTENDANCE_MARKED": "Attendance recorded",
+      "ROUTINE_ASSIGNED": "Routine assigned"
+    }
+  },
+  "dashboard": {
+    "adminLabel": "GYM ADMINISTRATION",
+    "loading": "Loading your gym dashboard…",
+    "loadError": "Gym dashboard unavailable",
+    "gymSettings": "Gym settings",
+    "modulesTitle": "Gym modules",
+    "modulesHint": "Every tool opens its real section and uses the recorded data.",
+    "paymentsDisclaimer": "Payments are administrative records; no online payment processing is enabled.",
+    "cards": {
+      "activeMembers": "Active members",
+      "registeredHint": "{{total}} registered members",
+      "activeMemberships": "Current memberships",
+      "expiringHint": "{{count}} expiring soon",
+      "todayAttendance": "Check-ins today",
+      "monthHint": "{{count}} this month",
+      "monthRevenue": "Income this month",
+      "excludingVoided": "Excluding voided payments",
+      "pendingDebt": "Outstanding debt",
+      "calculatedBalance": "Calculated balance"
+    },
+    "modules": {
+      "gymInfo": {
+        "title": "Gym information",
+        "description": "Commercial details, location, logo and currency."
+      },
+      "members": {
+        "title": "Members",
+        "description": "Member directory and assignments."
+      },
+      "instructors": {
+        "title": "Instructors",
+        "description": "Instructor accounts and member assignments."
+      },
+      "plans": {
+        "title": "Membership plans",
+        "description": "Gym-specific prices, durations and conditions."
+      },
+      "subscriptions": {
+        "title": "Memberships",
+        "description": "Assignments, renewals, history and expirations."
+      },
+      "payments": {
+        "title": "Payments",
+        "description": "Administrative records of payments received outside the platform."
+      },
+      "receivables": {
+        "title": "Outstanding balances",
+        "description": "Charges, partial payments and overdue debts."
+      },
+      "cash": {
+        "title": "Cash register",
+        "description": "Daily cash sessions, opening and closing."
+      },
+      "attendance": {
+        "title": "Attendance",
+        "description": "Manual and QR check-ins, access rules and history."
+      },
+      "routines": {
+        "title": "Routines",
+        "description": "Routine builder, assignments, versions and history."
+      },
+      "reports": {
+        "title": "Reports",
+        "description": "Real metrics, charts and PDF/Excel exports."
+      },
+      "settings": {
+        "title": "Settings & profile",
+        "description": "Operating preferences and administrator account."
+      }
+    }
   }
 }

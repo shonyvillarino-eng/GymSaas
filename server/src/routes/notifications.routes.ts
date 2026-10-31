@@ -6,6 +6,7 @@ import {
   markAsRead,
   markAllAsRead,
   getAnnouncements,
+  manageAnnouncements,
   createAnnouncement,
   publishAnnouncement,
   archiveAnnouncement,
@@ -24,6 +25,7 @@ notificationsRouter.patch('/read-all', markAllAsRead);
 
 // Announcements
 notificationsRouter.get('/announcements', getAnnouncements);
+notificationsRouter.get('/announcements/manage', requireRole('GYM_ADMIN'), manageAnnouncements);
 notificationsRouter.post('/announcements', requireRole('GYM_ADMIN'), createAnnouncement);
 notificationsRouter.post('/announcements/:id/publish', requireRole('GYM_ADMIN'), publishAnnouncement);
 notificationsRouter.post('/announcements/:id/archive', requireRole('GYM_ADMIN'), archiveAnnouncement);

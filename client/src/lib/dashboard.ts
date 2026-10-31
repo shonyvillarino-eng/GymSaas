@@ -1,3 +1,5 @@
+import { API_BASE, ApiRequestError, apiErrorMessage } from './api';
+
 /* ---------------- API shapes ---------------- */
 
 export interface DashboardOverview {
@@ -248,6 +250,55 @@ export function formatDateTimeForDisplay(value: string | null | undefined): stri
   if (!value) return '—';
   return new Date(value).toLocaleString();
 }
+
+/**
+ * Downloads a generated report as a real file.
+ *
+ * The endpoint is authenticated with the HttpOnly cookie, so the request goes
+ * through fetch instead of a bare link; a failed generation surfaces an error
+ * message rather than navigating the browser to a JSON error body.
+ */
+export async function downloadReport(
+  report: ExportReport,
+  format: ExportFormat,
+  params: Record<string, string | undefined> = {},
+): Promise<void> {
+  const query = new URLSearchParams({ report, format });
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== '' && value !== 'all') query.set(key, value);
+  }
+
+  const response = await fetch(`${API_BASE}/reports/export?${query.toString()}`, {
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    let message = 'The report could not be generated.';
+    try {
+      const body = (await response.json()) as { error?: string; details?: Record<string, string[]> };
+      message = body.error ?? message;
+      const details = Object.values(body.details ?? {}).flat().join(' ');
+      if (details) message = `${message}: ${details}`;
+    } catch {
+      // Keep the generic message when the response is not JSON.
+    }
+    throw new ApiRequestError(response.status, message);
+  }
+
+  const blob = await response.blob();
+  const disposition = response.headers.get('content-disposition') ?? '';
+  const filename = /filename="?([^";]+)"?/.exec(disposition)?.[1] ?? `${report}.${format}`;
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+export { apiErrorMessage };
 
 export function statusBadge(status: string): string {
   if (status === 'ACTIVE' || status === 'COMPLETED') return 'bg-primary/10 text-primary';

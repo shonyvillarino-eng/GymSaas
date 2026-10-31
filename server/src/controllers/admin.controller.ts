@@ -202,6 +202,9 @@ export async function createGym(req: Request, res: Response) {
         province: input.province ?? null,
         country: input.country ?? null,
         timezone: input.timezone ?? 'UTC',
+        // New installations default to Spanish (Prompt 14 requirement).
+        language: 'es',
+        locale: 'es-ES',
         isActive: true,
       },
     });

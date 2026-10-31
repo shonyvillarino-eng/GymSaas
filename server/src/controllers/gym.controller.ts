@@ -5,7 +5,13 @@ import { AppError } from '../middlewares/errorHandler.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
 import { clientIp, writeAudit } from '../services/audit.js';
 import { parseOrThrow } from '../validations/schemas.js';
-import { gymPreferencesSchema, gymProfileUpdateSchema, passwordChangeSchema, profileUpdateSchema } from '../validations/gym-admin.schemas.js';
+import {
+  gymLocalizationSchema,
+  gymPreferencesSchema,
+  gymProfileUpdateSchema,
+  passwordChangeSchema,
+  profileUpdateSchema,
+} from '../validations/gym-admin.schemas.js';
 import { uploadGymLogo } from '../lib/objectStorage.js';
 import { preferencesFromSettings } from '../services/gymPreferences.js';
 
@@ -37,6 +43,7 @@ export async function getMyGym(req: Request, res: Response) {
     select: {
       id: true, name: true, email: true, phone: true, address: true, city: true,
       province: true, postalCode: true, country: true, timezone: true, currency: true,
+      language: true, locale: true,
       logoUrl: true, isActive: true, settings: true, createdAt: true, updatedAt: true,
       _count: { select: { memberProfiles: true, instructorProfiles: true, plans: true, subscriptions: true } },
     },
@@ -78,6 +85,47 @@ export async function uploadMyGymLogo(req: Request, res: Response) {
   const updated = await prisma.gym.findUniqueOrThrow({ where: { id: gymId }, select: { id: true, logoUrl: true, updatedAt: true } });
   await audit(req, gymId, 'GymLogo', { objectKey: result.key }, activeGym.logoUrl ? { logoUrl: activeGym.logoUrl } : undefined);
   res.status(201).json({ data: updated });
+}
+
+/* ------------------------------------------------------------------ */
+/* Localization (language / locale / country / timezone / currency)    */
+/* ------------------------------------------------------------------ */
+
+export async function getMyLocalization(req: Request, res: Response) {
+  const gymId = gymIdFromSession(req);
+  const gym = await prisma.gym.findFirst({
+    where: { id: gymId, isActive: true },
+    select: { language: true, locale: true, country: true, timezone: true, currency: true },
+  });
+  if (!gym) throw new AppError('Gym not found', 404);
+  res.json({
+    data: {
+      ...gym,
+      // Spanish is the documented default for installations without a value.
+      language: gym.language ?? 'es',
+      locale: gym.locale ?? 'es-ES',
+    },
+  });
+}
+
+export async function updateMyLocalization(req: Request, res: Response) {
+  const gymId = gymIdFromSession(req);
+  const input = parseOrThrow(gymLocalizationSchema, req.body);
+  const current = await prisma.gym.findFirst({
+    where: { id: gymId, isActive: true },
+    select: { language: true, locale: true, country: true, timezone: true, currency: true },
+  });
+  if (!current) throw new AppError('Gym not found', 404);
+
+  const changed = await prisma.gym.updateMany({ where: { id: gymId, isActive: true }, data: input });
+  if (changed.count !== 1) throw new AppError('Gym is suspended or unavailable', 403);
+
+  const updated = await prisma.gym.findUniqueOrThrow({
+    where: { id: gymId },
+    select: { language: true, locale: true, country: true, timezone: true, currency: true },
+  });
+  await audit(req, gymId, 'GymLocalization', input as Prisma.InputJsonValue, current as unknown as Prisma.InputJsonValue);
+  res.json({ data: { ...updated, language: updated.language ?? 'es', locale: updated.locale ?? 'es-ES' } });
 }
 
 export async function getMyPreferences(req: Request, res: Response) {
