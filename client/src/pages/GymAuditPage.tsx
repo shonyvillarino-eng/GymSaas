@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCheck, ChevronLeft, ChevronRight, Columns3, Eye, EyeOff } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, CheckCheck, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
 
 import { Button } from '../components/ui/Button';
-import { DataTable } from '../components/ui/DataTable';
 import { ErrorState, LoadingState } from '../components/ui/states';
 import { api, apiErrorMessage } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -21,18 +20,25 @@ type EventRow = {
   actorName: string | null;
 };
 type Meta = { page: number; pageSize: number; total: number; totalPages: number };
-type Page = { data: EventRow[]; meta: Meta };
+type Page = { data: EventRow[]; meta: Meta | null };
 
 export function GymAuditPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { back, language, locale } = useAuth();
+  const { isSuperAdmin } = useAuth();
   const [scope, setScope] = useState<'gym' | 'global'>('gym');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [rows, setRows] = useState<EventRow[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
-  const [filters, setFilters] = useState({ action: 'ALL', entityType: 'ALL', result: 'ALL', userId: '', from: '', to: '' });
+  const [filters, setFilters] = useState({
+    action: 'ALL',
+    entityType: 'ALL',
+    result: 'ALL',
+    userId: '',
+    from: '',
+    to: '',
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -45,11 +51,9 @@ export function GymAuditPage() {
       if (filters.result !== 'ALL') params.set('result', filters.result);
       if (filters.userId) params.set('userId', filters.userId);
       if (filters.from) params.set('from', filters.from);
-      if (filters.to) params.set('to', filters.to);
-      const page = 1;
-      const response = await api<Page>(`/audit?${params.toString()}`);
+      if (filters.to) params.set('to', filters.to);        const response = await api<Page>(`/audit?${params.toString()}`);
       setRows(response.data);
-      setMeta(response.meta);
+      setMeta(response.meta ?? null);
     } catch (cause) {
       setError(apiErrorMessage(cause));
     } finally {
@@ -57,54 +61,91 @@ export function GymAuditPage() {
     }
   }, [scope, filters]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-  const dataTable = useMemo(
+  const tableColumns = useMemo(
+    () => [
+      {
+        key: 'date',
+        header: t('audit.date'),
+        render: (row: EventRow) => (
+          <time
+            className="whitespace-nowrap text-xs tabular-nums"
+            dateTime={row.createdAt}
+          >
+            {new Date(row.createdAt).toLocaleString(navigator.language, {
+              dateStyle: 'short',
+              timeStyle: 'short',
+            })}
+          </time>
+        ),
+      },
+      {
+        key: 'action',
+        header: t('audit.action'),
+        render: (row: EventRow) => (
+          <span className="capitalize text-xs font-medium">
+            {t(`audit.actions.${row.action}`, { defaultValue: row.action })}
+          </span>
+        ),
+      },
+      {
+        key: 'entity',
+        header: t('audit.entity'),
+        render: (row: EventRow) => (
+          <span className="text-xs">
+            <span className="text-muted-foreground">
+              {t(`audit.EntityType.${row.entityType}`, { defaultValue: row.entityType })}
+            </span>
+            <span className="text-muted-foreground"> • </span>
+            <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px]">
+              {row.entityId.slice(0, 8)}…
+            </kbd>
+          </span>
+        ),
+      },
+      {
+        key: 'result',
+        header: t('audit.result'),
+        render: (row: EventRow) => (
+          <span
+            className={cn(
+              'inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium',
+              row.result === 'SUCCESS' ? 'bg-emerald-50 text-emerald-700' : 'bg-destructive/10 text-destructive',
+            )}
+          >
+            {row.result}
+          </span>
+        ),
+      },
+      {
+        key: 'actor',
+        header: t('audit.actor'),
+        render: (row: EventRow) => (
+          <span className="text-xs">
+            {row.actorName ?? t('audit.systemActor')}
+          </span>
+        ),
+      },
+      {
+        key: 'gym',
+        header: '',
+        render: (row: EventRow) => (
+          <span className="text-right text-[10px] text-muted-foreground">
+            {row.gymName ?? ''}
+          </span>
+        ),
+      },
+    ],
+    [t],
+  );
+  const tableConfig = useMemo(
     () => ({
-      columns: [
-        {
-          header: t('audit.date'),
-          accessor: (row: EventRow) => (
-            <time className="whitespace-nowrap text-xs tabular-nums" dateTime={row.createdAt}>
-              {new Date(row.createdAt).toLocaleString(navigator.language, { dateStyle: 'short', timeStyle: 'short' })}
-            </time>
-          ),
-        },
-        {
-          header: t('audit.action'),
-          accessor: (row: EventRow) => <span className="capitalize text-xs font-medium">{t(`audit.actions.${row.action}`, { defaultValue: row.action })}</span>,
-        },
-        {
-          header: t('audit.entity'),
-          accessor: (row: EventRow) => (
-            <span className="text-xs">
-              <span className="text-muted-foreground">{t(`audit.EntityType.${row.entityType}`, { defaultValue: row.entityType })}</span>
-              <span className="text-muted-foreground"> • </span>
-              <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px]">{row.entityId.slice(0, 8)}…</kbd>
-            </span>
-          ),
-        },
-        {
-          header: t('audit.result'),
-          accessor: (row: EventRow) => (
-            <span className={cn('inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium', row.result === 'SUCCESS' ? 'bg-emerald-50 text-emerald-700' : 'bg-destructive/10 text-destructive')}>
-              {row.result}
-            </span>
-          ),
-        },
-        {
-          header: t('audit.actor'),
-          accessor: (row: EventRow) => <span className="text-xs">{row.actorName ?? t('audit.systemActor')}</span>,
-        },
-        {
-          header: '',
-          accessor: (row: EventRow) => <span className="text-right text-[10px] text-muted-foreground">{row.gymName ?? ''}</span>,
-        },
-      ],
-      data: rows.map((row) => ({ ...row, createdAt: row.createdAt })),
       meta,
       page: meta?.page ?? 1,
-      setPage: (page: number) => {
+      setPage: (_page: number) => {
         const params = new URLSearchParams();
         if (scope === 'global') params.set('scope', 'global');
         if (filters.action !== 'ALL') params.set('action', filters.action);
@@ -113,40 +154,65 @@ export function GymAuditPage() {
         if (filters.userId) params.set('userId', filters.userId);
         if (filters.from) params.set('from', filters.from);
         if (filters.to) params.set('to', filters.to);
-        params.set('page', String(page));
+        params.set('page', String(_page));
         void load();
       },
     }),
-    [rows, meta, t, filters, scope, load],
+    [meta, scope, filters, load],
   );
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
+          <Button variant="ghost" onClick={() => navigate(-1)}>
             <ArrowLeft className="mr-1 h-4 w-4" /> {t('app.back')}
           </Button>
           <div className="flex rounded-lg border border-border bg-card p-1 text-xs">
             <button
               type="button"
-              className={cn('rounded-md px-2 py-1 text-left font-medium transition', scope === 'gym' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground')}
-              onClick={() => { setScope('gym'); load(); }}
+              className={cn(
+                'rounded-md px-2 py-1 text-left font-medium transition',
+                scope === 'gym' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground',
+              )}
+              onClick={() => {
+                setScope('gym');
+                load();
+              }}
             >
               {t('audit.scopeGym')}
             </button>
             <button
               type="button"
-              className={cn('rounded-md px-2 py-1 text-left font-medium transition', scope === 'global' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground')}
-              onClick={() => { setScope('global'); load(); }}
-              disabled={!useAuth().isSuperAdmin}
+              className={cn(
+                'rounded-md px-2 py-1 text-left font-medium transition',
+                scope === 'global' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground',
+              )}
+              onClick={() => {
+                setScope('global');
+                load();
+              }}
+              disabled={!isSuperAdmin}
             >
               {t('audit.scopeGlobal')}
             </button>
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="ghost" size="sm" onClick={() => setFilters({ ...filters, userId: '', from: '', to: '', action: 'ALL', entityType: 'ALL', result: 'ALL' })}>
+          <Button
+            variant="ghost"
+            onClick={() =>
+              setFilters({
+                ...filters,
+                userId: '',
+                from: '',
+                to: '',
+                action: 'ALL',
+                entityType: 'ALL',
+                result: 'ALL',
+              })
+            }
+          >
             {t('audit.clear')}
           </Button>
         </div>
@@ -165,8 +231,33 @@ export function GymAuditPage() {
           onChange={(e) => setFilters({ ...filters, action: e.target.value })}
         >
           <option value="ALL">{t('audit.allActions')}</option>
-          {['LOGIN', 'LOGOUT', 'LOGIN_FAILED', 'CREATE', 'UPDATE', 'DELETE', 'RESTORE', 'LOCK', 'UNLOCK', 'ASSIGN', 'UNASSIGN', 'EXPORT', 'PAYMENT_REGISTERED', 'ATTENDANCE_MARKED', 'ROUTINE_ASSIGNED', 'PUBLISH', 'ARCHIVE', 'VOID', 'REFUND', 'PASSWORD_CHANGE', 'SETTINGS_UPDATE', 'INVITE'].map((a) => (
-            <option key={a} value={a}>{t(`audit.actions.${a}`, { defaultValue: a })}</option>
+          {[
+            'LOGIN',
+            'LOGOUT',
+            'LOGIN_FAILED',
+            'CREATE',
+            'UPDATE',
+            'DELETE',
+            'RESTORE',
+            'LOCK',
+            'UNLOCK',
+            'ASSIGN',
+            'UNASSIGN',
+            'EXPORT',
+            'PAYMENT_REGISTERED',
+            'ATTENDANCE_MARKED',
+            'ROUTINE_ASSIGNED',
+            'PUBLISH',
+            'ARCHIVE',
+            'VOID',
+            'REFUND',
+            'PASSWORD_CHANGE',
+            'SETTINGS_UPDATE',
+            'INVITE',
+          ].map((a) => (
+            <option key={a} value={a}>
+              {t(`audit.actions.${a}`, { defaultValue: a })}
+            </option>
           ))}
         </select>
         <select
@@ -175,8 +266,24 @@ export function GymAuditPage() {
           onChange={(e) => setFilters({ ...filters, entityType: e.target.value })}
         >
           <option value="ALL">{t('audit.entity')}…</option>
-          {['User', 'Membership', 'Payment', 'Subscription', 'Attendance', 'Routine', 'Plan', 'Instructor', 'Announcement', 'CashRegister', 'BusinessSettings', 'Gym', 'Notification'].map((e) => (
-            <option key={e} value={e.toUpperCase()}>{t(`audit.EntityType.${e.toUpperCase()}`, { defaultValue: e })}</option>
+          {[
+            'User',
+            'Membership',
+            'Payment',
+            'Subscription',
+            'Attendance',
+            'Routine',
+            'Plan',
+            'Instructor',
+            'Announcement',
+            'CashRegister',
+            'BusinessSettings',
+            'Gym',
+            'Notification',
+          ].map((e) => (
+            <option key={e} value={e.toUpperCase()}>
+              {t(`audit.EntityType.${e.toUpperCase()}`, { defaultValue: e })}
+            </option>
           ))}
         </select>
         <select
@@ -185,8 +292,26 @@ export function GymAuditPage() {
           onChange={(e) => setFilters({ ...filters, result: e.target.value })}
         >
           <option value="ALL">{t('audit.result')}…</option>
-          {['SUCCESS', 'FAILURE', 'FORBIDDEN', 'NOT_FOUND', 'CONFLICT', 'UNAUTHORIZED', 'ERROR'].map((r) => (
-            <option key={r} value={r}>{r === 'SUCCESS' ? 'Éxito' : r === 'FAILURE' ? 'Error' : r === 'FORBIDDEN' ? 'Prohibido' : r === 'UNAUTHORIZED' ? 'No autorizado' : r}</option>
+          {[
+            'SUCCESS',
+            'FAILURE',
+            'FORBIDDEN',
+            'NOT_FOUND',
+            'CONFLICT',
+            'UNAUTHORIZED',
+            'ERROR',
+          ].map((r) => (
+            <option key={r} value={r}>
+              {r === 'SUCCESS'
+                ? 'Éxito'
+                : r === 'FAILURE'
+                  ? 'Error'
+                  : r === 'FORBIDDEN'
+                    ? 'Prohibido'
+                    : r === 'UNAUTHORIZED'
+                      ? 'No autorizado'
+                      : r}
+            </option>
           ))}
         </select>
         <input
@@ -212,7 +337,10 @@ export function GymAuditPage() {
 
       {meta && (
         <p className="text-xs text-muted-foreground">
-          {t('audit.summary', { total: meta.total, scope: scope === 'global' ? t('audit.scopeGlobal') : t('audit.scopeGym') })}
+          {t('audit.summary', {
+            total: meta.total,
+            scope: scope === 'global' ? t('audit.scopeGlobal') : t('audit.scopeGym'),
+          })}
         </p>
       )}
 
@@ -240,7 +368,9 @@ export function GymAuditPage() {
         </div>
       )}
 
-      {loading && !rows.length ? <LoadingState label={t('audit.loading')} /> : error ? (
+      {loading && !rows.length ? (
+        <LoadingState label={t('audit.loading')} />
+      ) : error ? (
         <ErrorState title={t('audit.loadError')} message={error} onRetry={load} />
       ) : rows.length === 0 ? (
         <div className="rounded-lg border border-border bg-card p-10 text-center text-sm text-muted-foreground">
@@ -259,19 +389,82 @@ export function GymAuditPage() {
               </span>
             </div>
           </div>
-          <DataTable table={dataTable} />
+            <AuditTable
+            columns={tableColumns}
+            data={rows}
+            meta={tableConfig.meta}
+            page={tableConfig.page}
+            setPage={tableConfig.setPage}
+          />
           {meta && meta.page > 1 && (
             <div className="flex justify-end gap-1 text-xs text-muted-foreground">
-              <Button variant="outline" size="sm" disabled={meta.page <= 1} onClick={() => dataTable.setPage(meta.page - 1)}>
+              <Button variant="outline" disabled={meta.page <= 1} onClick={() => tableConfig.setPage(meta.page - 1)}>
                 <ChevronLeft className="mr-1 h-3 w-3" /> Anterior
               </Button>
               <span className="px-1">{meta.page} / {meta.totalPages}</span>
-              <Button variant="outline" size="sm" disabled={meta.page >= meta.totalPages} onClick={() => dataTable.setPage(meta.page + 1)}>
+              <Button variant="outline" disabled={meta.page >= meta.totalPages} onClick={() => tableConfig.setPage(meta.page + 1)}>
                 Siguiente <ChevronRight className="ml-1 h-3 w-3" />
               </Button>
             </div>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+function AuditTable<T extends { id: string }>({
+  columns,
+  data,
+  meta,
+  page: _page,
+  setPage,
+}: {
+  columns: Array<{ key: string; header: string; render: (row: T) => React.ReactNode }>;
+  data: T[];
+  meta: Meta | null;
+  page: number;
+  setPage: (page: number) => void;
+}) {
+  return (
+    <div className="surface-card overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border bg-muted/50 text-left text-muted-foreground">
+              {columns.map((col) => (
+                <th key={col.key} className="px-4 py-3 font-medium">
+                  {col.header}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((row) => (
+              <tr key={row.id} className="border-b border-border last:border-0">
+                {columns.map((col) => (
+                  <td key={col.key} className="px-4 py-3">
+                    {col.render(row)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {meta && meta.total > 0 && (
+        <footer className="flex items-center justify-between border-t border-border p-3 text-sm">
+          <span>{meta.total} eventos · página {meta.page} / {meta.totalPages}</span>
+          <div className="flex gap-2">
+            <Button variant="outline" disabled={meta.page <= 1} onClick={() => setPage(meta.page - 1)}>
+              <ChevronLeft className="mr-1 h-3 w-3" /> Anterior
+            </Button>
+            <span className="px-1">{meta.page} / {meta.totalPages}</span>
+            <Button variant="outline" disabled={meta.page >= meta.totalPages} onClick={() => setPage(meta.page + 1)}>
+              Siguiente <ChevronRight className="ml-1 h-3 w-3" />
+            </Button>
+          </div>
+        </footer>
       )}
     </div>
   );

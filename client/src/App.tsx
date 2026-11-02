@@ -7,6 +7,7 @@ import { LoadingState } from './components/ui/states';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { LoginPage } from './pages/LoginPage';
 import { CompleteSetupPage } from './pages/CompleteSetupPage';
+import { GymAuditPage } from './pages/GymAuditPage';
 
 /**
  * Route-level code splitting: each module is downloaded only when the user
@@ -47,12 +48,11 @@ const PortalMembershipPage = lazy(() => import('./pages/portal/PortalMembershipP
 const PortalPaymentsPage = lazy(() => import('./pages/portal/PortalPaymentsPage').then((m) => ({ default: m.PortalPaymentsPage })));
 const PortalNotificationsPage = lazy(() => import('./pages/portal/PortalNotificationsPage').then((m) => ({ default: m.PortalNotificationsPage })));
 const GymReportsPage = lazy(() => import('./pages/GymReportsPage'));
-const GymAuditPage = lazy(() => import('./pages/GymAuditPage').then((m) => ({ default: m.GymAuditPage })));
-const NotificationsPage = lazy(() => import('./pages/NotificationsPage').then((m) => ({ default: m.NotificationsPage })));
-const GymAnnouncementsPage = lazy(() => import('./pages/GymAnnouncementsPage').then((m) => ({ default: m.GymAnnouncementsPage })));
 const GymMembersReportPage = lazy(() => import('./pages/GymMembersReportPage').then((m) => ({ default: m.GymMembersReportPage })));
 const GymAttendanceReportPage = lazy(() => import('./pages/GymAttendanceReportPage').then((m) => ({ default: m.GymAttendanceReportPage })));
 const GymFinancialReportPage = lazy(() => import('./pages/GymFinancialReportPage').then((m) => ({ default: m.GymFinancialReportPage })));
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage').then((m) => ({ default: m.NotificationsPage })));
+const GymAnnouncementsPage = lazy(() => import('./pages/GymAnnouncementsPage').then((m) => ({ default: m.GymAnnouncementsPage })));
 
 export function App() {
   return (
@@ -128,7 +128,7 @@ export function App() {
               <Route path="/admin" element={<AdminDashboardPage />} />
               <Route path="/admin/gyms" element={<GymsPage />} />
               <Route path="/admin/gyms/:id" element={<GymDetailPage />} />
-              <Route path="/admin/audit" element={<GymAuditPage global />} />
+              <Route path="/admin/audit" element={<GymAuditPage />} />
             </Route>
           </Route>
           <Route element={<ProtectedRoute roles={['GYM_ADMIN', 'INSTRUCTOR', 'MEMBER']} />}>

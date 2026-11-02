@@ -71,21 +71,12 @@ const PERIOD_OPTIONS: Period[] = ['today', '7d', '30d', 'month', 'previous_month
 
 const COLORS = ['#2563eb', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
-function formatMonth(value: string, locale: string) {
+function formatMonth(value: string, locale: string): string {
   if (!value) return '—';
   const date = new Date(`${value}-01T12:00:00`);
   return Number.isNaN(date.getTime())
     ? value
     : new Intl.DateTimeFormat(locale, { month: 'short', year: '2-digit' }).format(date);
-}
-
-function PurchaseOption({ label, onClick }: { label: string; onClick: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <button type="button" className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-left text-sm hover:bg-muted focus:border-primary" onClick={onClick}>
-      {label}
-    </button>
-  );
 }
 
 function ChartCard({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
@@ -119,7 +110,7 @@ function Change({ value, locale }: { value: number | null; locale: string }) {
 const GymReportsPage = memo(function GymReportsPage() {
   const { t } = useTranslation();
   const { language, locale } = useAuth();
-  const formatLocale = resolveLocale(language, locale);
+  const effectiveLocale = resolveLocale(language, locale) ?? locale ?? language;
   const [period, setPeriod] = useState<Period>('month');
   const [exportReportType, setExportReportType] = useState<ExportReport>('members');
   const [from, setFrom] = useState('');
@@ -184,11 +175,9 @@ const GymReportsPage = memo(function GymReportsPage() {
     } finally {
       setExporting(null);
     }
-  };
-
-  const currency = overview?.revenue.currency ?? 'USD';
-  const formatMoney = (value: number) => formatCurrency(value, currency, formatLocale);
-  const formatCount = (value: number | string | undefined | null) => formatNumber(value, formatLocale);
+  };  const currency = overview?.revenue.currency ?? 'USD';
+  const formatMoneySimple = (value: number | string | null | undefined) => formatCurrency(value ?? 0, currency, effectiveLocale);
+  const formatCount = (value: number | string) => formatNumber(value, effectiveLocale);
 
   const cards = overview
     ? [
@@ -200,8 +189,8 @@ const GymReportsPage = memo(function GymReportsPage() {
         { label: t('reports.cards.expiredMemberships'), value: formatCount(overview.memberships.expired), hint: t('reports.currentValue') },
         { label: t('reports.cards.todayAttendance'), value: formatCount(overview.attendance.today), hint: t('reports.today') },
         { label: t('reports.cards.monthAttendance'), value: formatCount(overview.attendance.thisMonth), hint: t('reports.currentMonth') },
-        { label: t('reports.cards.monthRevenue'), value: formatMoney(overview.revenue.collectedThisMonth), hint: t('reports.excludingVoided') },
-        { label: t('reports.cards.pendingDebt'), value: formatMoney(overview.revenue.pendingObligations), hint: t('reports.calculatedBalance') },
+        { label: t('reports.cards.monthRevenue'), value: formatMoneySimple(overview.revenue.collectedThisMonth), hint: t('reports.excludingVoided') },
+        { label: t('reports.cards.pendingDebt'), value: formatMoneySimple(overview.revenue.pendingObligations), hint: t('reports.calculatedBalance') },
       ]
     : [];
 
@@ -292,11 +281,11 @@ const GymReportsPage = memo(function GymReportsPage() {
           ) : <EmptyChart />}
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
             <span>{t('reports.charts.total')}: {formatNumber(attendance?.total)}</span>
-            <Change value={attendance?.comparison.changePct ?? null} />
+            <Change value={attendance?.comparison.changePct ?? null} locale={effectiveLocale} />
             <span>
               {t('reports.charts.peak')}:{' '}
               {attendance?.peak
-                ? `${formatDate(attendance.peak.day ?? '')}${attendance.peak.hour !== null && attendance.peak.hour !== undefined ? ` · ${String(attendance.peak.hour).padStart(2, '0')}:00` : ''}`
+                ? `${formatDate(attendance.peak.day ?? '', effectiveLocale)}${attendance.peak.hour !== null && attendance.peak.hour !== undefined ? ` · ${String(attendance.peak.hour).padStart(2, '0')}:00` : ''}`
                 : t('reports.charts.notEnoughData')}
             </span>
           </div>
@@ -329,15 +318,15 @@ const GymReportsPage = memo(function GymReportsPage() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                 <YAxis />
-                <Tooltip formatter={(value) => formatMoney(Number(value))} />
+                <Tooltip formatter={(value) => formatMoneySimple(value as string | number)} />
                 <Legend />
                 <Line type="monotone" dataKey="total" name={t('reports.cards.monthRevenue')} stroke="#22c55e" strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
           ) : <EmptyChart />}
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span>{t('reports.charts.total')}: {formatMoney(revenue?.total ?? 0)} ({t('reports.charts.totalPagos', { total: formatNumber(revenue?.count) })})</span>
-            <Change value={revenue?.comparison.changePct ?? null} />
+            <span>{t('reports.charts.total')}: {formatMoneySimple(revenue?.total ?? 0)} ({t('reports.charts.totalPagos', { total: formatCount(revenue?.count) })})</span>
+            <Change value={revenue?.comparison.changePct ?? null} locale={effectiveLocale} />
           </div>
         </ChartCard>
 
@@ -354,7 +343,7 @@ const GymReportsPage = memo(function GymReportsPage() {
                 >
                   {revenue.byMethod.map((row, index) => <Cell key={row.method} fill={COLORS[index % COLORS.length]} />)}
                 </Pie>
-                <Tooltip formatter={(value) => formatMoney(Number(value))} />
+                <Tooltip formatter={(value) => formatMoneySimple(value as string | number)} />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
@@ -386,9 +375,9 @@ const GymReportsPage = memo(function GymReportsPage() {
             <ResponsiveContainer width="100%" height={280}>
               <AreaChart data={memberships.newMembers}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" tickFormatter={formatMonth} tick={{ fontSize: 11 }} />
+                <XAxis dataKey="month" tickFormatter={(value: string) => formatMonth(value, effectiveLocale)} tick={{ fontSize: 11 }} />
                 <YAxis allowDecimals={false} />
-                <Tooltip labelFormatter={(label) => formatMonth(String(label ?? ''))} />
+                <Tooltip labelFormatter={(label: string | unknown) => formatMonth(String(label ?? ''), effectiveLocale)} />
                 <Legend />
                 <Area type="monotone" dataKey="count" name={t('reports.charts.newMembers')} stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.2} />
               </AreaChart>
@@ -401,9 +390,9 @@ const GymReportsPage = memo(function GymReportsPage() {
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={memberships.renewals}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" tickFormatter={formatMonth} tick={{ fontSize: 11 }} />
+                <XAxis dataKey="month" tickFormatter={(value: string) => formatMonth(value, effectiveLocale)} tick={{ fontSize: 11 }} />
                 <YAxis allowDecimals={false} />
-                <Tooltip labelFormatter={(label) => formatMonth(String(label ?? ''))} />
+                <Tooltip labelFormatter={(label: string | unknown) => formatMonth(String(label ?? ''), effectiveLocale)} />
                 <Legend />
                 <Bar dataKey="count" name={t('reports.charts.renewals')} fill="#06b6d4" />
               </BarChart>
@@ -416,7 +405,7 @@ const GymReportsPage = memo(function GymReportsPage() {
             <div className="flex h-[280px] flex-col justify-center gap-3 text-sm">
               <p className="text-3xl font-semibold">{String(attendance.peak.hour ?? 0).padStart(2, '0')}:00</p>
               <p className="text-muted-foreground">
-                {t('reports.charts.peakSummary', { value: formatNumber(attendance.peak.count), day: attendance.peak.day ? formatDate(attendance.peak.day) : '—' })}
+                {t('reports.charts.peakSummary', { value: formatNumber(attendance.peak.count), day: attendance.peak.day ? formatDate(attendance.peak.day, effectiveLocale) : '—' })}
               </p>
               <p className="text-xs text-muted-foreground">{t('reports.charts.peakDataSource')}</p>
             </div>
@@ -451,7 +440,7 @@ const GymReportsPage = memo(function GymReportsPage() {
                   <tr key={row.memberId} className="border-t border-border">
                     <td className="px-4 py-2">{row.memberName}</td>
                     <td className="px-4 py-2">{t(`reports.status.${row.status}`, { defaultValue: row.status })}</td>
-                    <td className="px-4 py-2">{formatDate(row.endDate)}</td>
+                    <td className="px-4 py-2">{formatDate(row.endDate, effectiveLocale)}</td>
                   </tr>
                 ))
               ) : (

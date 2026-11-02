@@ -28,6 +28,7 @@ interface AuthContextValue {
   language: SupportedLanguage;
   gymLanguage: SupportedLanguage | null;
   locale: string | null;
+  isSuperAdmin: boolean;
   login: (email: string, password: string) => Promise<SessionUser>;
   logout: () => Promise<void>;
   refresh: () => Promise<SessionUser | null>;
@@ -43,6 +44,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<SupportedLanguage>('es');
   const [gymLanguage, setGymLanguage] = useState<SupportedLanguage | null>(null);
   const [locale, setLocale] = useState<string | null>(null);
+
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
 
   /**
    * Resolves the language with the documented priority:
@@ -107,7 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateUser = useCallback((changes: Partial<Pick<SessionUser, 'fullName'>>) => {
-    setUser((current) => current ? { ...current, ...changes } : current);
+    setUser((current) => (current ? { ...current, ...changes } : current));
   }, []);
 
   /** Applies the personal language immediately, then persists it. */
@@ -130,7 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [language]);
 
   const value = useMemo(
-    () => ({ user, loading, language, gymLanguage, locale, login, logout, refresh, updateUser, setLanguage }),
+    () => ({ user, loading, language, gymLanguage, locale, isSuperAdmin, login, logout, refresh, updateUser, setLanguage }),
     [user, loading, language, gymLanguage, locale, login, logout, refresh, updateUser, setLanguage],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

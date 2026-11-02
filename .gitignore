@@ -1,44 +1,8 @@
-
-!.env.example
-!.vscode/extensions.json
-# Build outputs
-# Dependencies
-# Editor / OS
-# Environment variables
-# Local data
-# Logs
-# Prisma
-*.local
-*.log
-*.log
-*.tsbuildinfo
-.DS_Store
-.DS_Store
+# .gitignore
+node_modules
+dist
 .env
-.env
-.env.*
 .env.local
-.idea/
-.pnp
-.pnp.js
-.vite/
-.vscode/*
-Thumbs.db
-build/
-build/
-coverage/
-dist/
-dist/
-logs/
-node_modules/
-node_modules/
-npm-debug.log*
-pnpm-debug.log*
-prisma/dev.db
-server/.env
-server/prisma/*.db
-# Local embedded PostgreSQL cluster used by the integration suites
-.pgdata/
-server/.pgdata/
-yarn-debug.log*
-yarn-error.log*
+*.log
+.DS_Store
+```
