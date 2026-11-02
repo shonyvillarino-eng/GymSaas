@@ -2,6 +2,7 @@ import { createApp } from './app.js';
 import { env } from './config/env.js';
 import { prisma } from './lib/prisma.js';
 import { startNotificationSweep } from './services/notifications.js';
+import { getHealthStatus, getReadiness } from './routes/health/status.js';
 
 const app = createApp();
 
@@ -29,13 +30,12 @@ async function sweepMembershipLifecycle() {
       data: { status: 'ACTIVE' },
     });
   } catch (error) {
-    // Never log the query or connection string, only the failure event.
     console.error(
       JSON.stringify({
         level: 'error',
         event: 'membership_lifecycle_failed',
         message: error instanceof Error ? error.message : 'unknown',
-      })
+      }),
     );
   } finally {
     running = false;
@@ -56,7 +56,13 @@ const stopNotificationSweep =
 const server = app.listen(env.PORT, () => {
   console.log(`✅ API listening on http://localhost:${env.PORT}/api/v1`);
   console.log(`   Health: http://localhost:${env.PORT}/api/v1/health`);
+  console.log(`   Live:   http://localhost:${env.PORT}/api/v1/health/live`);
   console.log(`   Env:    ${env.NODE_ENV}`);
+  if (env.NODE_ENV === 'development') {
+    void getHealthStatus(prisma).then((health) => console.log(JSON.stringify({ health }, null, 2)));
+    void getReadiness(prisma).then((readiness) => console.log(JSON.stringify({ readiness }, null, 2)));
+  }
+
 });
 
 let shuttingDown = false;
