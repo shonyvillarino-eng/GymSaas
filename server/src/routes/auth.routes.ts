@@ -2,21 +2,22 @@ import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import rateLimit from 'express-rate-limit';
 
-import { env, isProd } from '../config/env.js';
+import { env } from '../config/env.js';
 import { prisma } from '../lib/prisma.js';
 import { cookieMaxAgeMs, signAccessToken } from '../lib/jwt.js';
 import { getDummyHash, hashPassword, verifyPassword } from '../lib/password.js';
 import { hashToken } from '../lib/tokens.js';
-import { AppError } from '../middlewares/errorHandler.js';
-import { requireAuth } from '../middlewares/auth.js';
+import { AppError, errorHandler } from '../middlewares/errorHandler.js';
+import { requireAuth, requireRole } from '../middlewares/auth.js';
 import { parseOrThrow } from '../validations/schemas.js';
 
 export const authRouter = Router();
+export { errorHandler };
 
 /** Brute-force protection for credential endpoints (per IP). */
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: isProd ? 10 : 200,
+  max: env.isProd ? 10 : 200,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many authentication attempts, please try again later.' },
@@ -68,7 +69,7 @@ function publicUser(user: {
  * Verifies credentials, rejects users of suspended gyms and issues the
  * session as an HttpOnly cookie (never accessible from JS).
  */
-authRouter.post('/login', authLimiter, async (req: Request, res: Response) => {
+authRouter.post('/login', authLimiter, async (req: Request & { auth?: { gymId?: string | null; role?: string; userId?: string } }, res: Response) => {
   const { email, password } = parseOrThrow(loginSchema, req.body);
 
   const user = await prisma.user.findUnique({

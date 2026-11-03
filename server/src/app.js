@@ -1,0 +1,95 @@
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import cookieParser from 'cookie-parser';
+import compression from 'compression';
+import rateLimit from 'express-rate-limit';
+import { randomUUID } from 'node:crypto';
+import { env, isProd } from './config/env.js';
+import { apiRouter } from './routes/index.js';
+import { notFoundHandler } from './middlewares/notFound.js';
+import { errorHandler } from './middlewares/errorHandler.js';
+import { metricsMiddleware } from './lib/metrics.js';
+import { checkReadiness } from './lib/readiness.js';
+const SLOW_REQUEST_MS = Number(process.env.SLOW_REQUEST_MS ?? 1000);
+function requestContext(req, res, next) {
+    const incoming = req.get('x-request-id');
+    let requestId;
+    if ((incoming ?? '').length > 0 && (incoming?.length ?? 0) <= 100) {
+        requestId = String(incoming);
+    }
+    else {
+        requestId = randomUUID();
+    }
+    req.requestId = requestId;
+    res.setHeader('X-Request-Id', requestId);
+    const start = process.hrtime.bigint();
+    res.on('finish', () => {
+        const durationMs = Number(process.hrtime.bigint() - start) / 1e6;
+        if (durationMs >= SLOW_REQUEST_MS) {
+            console.warn(JSON.stringify({
+                level: 'warn',
+                event: 'slow_request',
+                request_id: requestId,
+                method: req.method,
+                path: req.originalUrl.split('?')[0],
+                status: res.statusCode,
+                duration_ms: Math.round(durationMs)
+            }));
+        }
+    });
+    next();
+}
+export function createApp() {
+    const app = express();
+    app.set('trust proxy', 1);
+    app.disable('x-powered-by');
+    app.use(helmet());
+    app.use(cors({
+        origin: env.CORS_ORIGIN.split(',').map((o) => o.trim()),
+        credentials: true
+    }));
+    app.use(compression());
+    app.use(express.json({ limit: '1mb' }));
+    app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+    app.use(cookieParser());
+    app.use(requestContext);
+    app.use(morgan(isProd ? 'combined' : 'dev', {
+        skip: () => app.get('env') === 'test'
+    }));
+    app.use('/api', rateLimit({
+        windowMs: 15 * 60 * 1000,
+        max: 300,
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: { error: 'Too many requests, please try again later.' }
+    }));
+    app.use('/api/v1/auth', rateLimit({
+        windowMs: 15 * 60 * 1000,
+        max: 50,
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: { error: 'Too many authentication attempts, please try again later.' }
+    }));
+    app.use(metricsMiddleware);
+    app.use('/api/v1', apiRouter);
+    app.get('/health/live', (_req, res) => {
+        res.status(200).json({ status: 'ok', service: 'gym-saas-api', version: 'v1' });
+    });
+    app.get('/api/v1/health/ready', async (_req, res) => {
+        const ready = await checkReadiness();
+        res.status(ready.ready ? 200 : 503).json({
+            status: ready.ready ? 'ok' : 'error',
+            ready: ready.ready,
+            timestamp: new Date().toISOString(),
+            message: ready.ready ? 'Database reachable' : 'Database check failed',
+            database: ready.ready
+                ? { connected: true, latencyMs: ready.latencyMs }
+                : { connected: false, error: ready.error },
+        });
+    });
+    app.use(notFoundHandler);
+    app.use(errorHandler);
+    return app;
+}

@@ -1,2 +1,2 @@
-import { metricsMiddleware } from '../lib/metrics.js'
-export { metricsMiddleware }
+export { metricsMiddleware } from './metrics/middleware.js';
+export { metricsStore, registerRoutedPath } from './metrics/store.js';

@@ -1,26 +1,15 @@
-import { createApp } from '../src/app.js'
-import { env } from '../src/config/env.js'
-import { prisma } from '../src/lib/prisma.js'
-import { getHealthStatus, getReadiness } from '../src/routes/health/status.js'
+// Scripts de verificación de BD/S3/containers/listado de archivo de bloqueo de BD
+import { checkReadiness } from '../services/readiness.js'
+import { readiness } from '../services/readiness.js'
+import { prisma } from '../lib/prisma.js'
 
-const app = createApp()
-const server = app.listen(env.PORT, async () => {
-  console.log(`Listening on http://localhost:${env.PORT}`)
-  try {
-    const health = await getHealthStatus(prisma)
-    const readiness = await getReadiness(prisma)
-    console.log(JSON.stringify({ health, readiness }, null, 2))
-  } catch (error) {
-    console.error(error)
-    process.exit(1)
-  } finally {
-    server.close()
-    await prisma.$disconnect()
-    process.exit(0)
+async function runChecks() {
+  const checks = {
+    database: await checkReadiness(prisma, 5_000),
+    s3: readiness.canAccessS3,
   }
-})
 
-server.on('error', (error) => {
-  console.error(error)
-  process.exit(1)
-})
+  console.log(JSON.stringify(checks, null, 2))
+}
+
+runChecks().catch(console.error)

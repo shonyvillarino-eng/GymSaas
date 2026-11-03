@@ -51,7 +51,5 @@
   },
   "description": "Base path: `/api/v1`.",
   "main": "index.js",
-  "keywords": [],
-  "author": "",
-  "license": "ISC"
+  "keywords": []
 }

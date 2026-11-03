@@ -1,38 +1,23 @@
-import { Router } from 'express'
+import { checkReadiness } from './readiness.js'
+import { prisma } from './prisma.js'
 
-import { checkReadiness } from '../lib/health.js'
-import { createLogEntry, INFO, ERROR, safeStringify, env } from '../lib/logger.js'
+export async function startNotificationSweep(): Promise<() => void> {
+  const controller = new AbortController()
+  const ping = setInterval(async () => {
+    if (controller.signal.aborted) return
+    try {
+      const ready = await checkReadiness(prisma, 5000)
+      if (!ready.ready) {
+        console.warn(JSON.stringify({ level: 'warn', event: 'notification_sweep_unhealthy', ready }))
+      }
+    } catch (error) {
+      console.error(JSON.stringify({ level: 'error', event: 'notification_sweep_error', error: error instanceof Error ? error.message : 'unknown' }))
+    }
+  }, 10_000)
 
-const router = Router()
-
-router.get('/', (_req, res) => {
-  res.status(200).json({
-    status: 'ok',
-    uptimeMs: Math.round(process.uptime() * 1000),
-    env: env.NODE_ENV,
-    timestamp: new Date().toISOString(),
-  })
-})
-
-router.get('/live', (_req, res) => {
-  res.status(200).json({
-    status: 'alive',
-    uptimeMs: Math.round(process.uptime() * 1000),
-    timestamp: new Date().toISOString(),
-  })
-})
-
-router.get('/ready', async (_req, res) => {
-  const ready = await checkReadiness()
-  res.status(ready.ready ? 200 : 503).json({
-    status: ready.ready ? 'ok' : 'error',
-    ready: ready.ready,
-    timestamp: new Date().toISOString(),
-    message: ready.message,
-    database: ready.ready
-      ? { connected: true, latencyMs: ready.latencyMs }
-      : { connected: false, error: ready.error },
-  })
-})
-
-export { router as healthRouter }
+  return () => {
+    controller.abort()
+    clearInterval(ping)
+    prisma.$disconnect()
+  }
+}

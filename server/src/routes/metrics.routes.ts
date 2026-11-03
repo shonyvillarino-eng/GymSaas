@@ -1,12 +1,10 @@
 import { Router } from 'express'
 import type { Request, Response } from 'express'
 
-import { metricsRouter } from '../lib/metrics.js'
-import { healthRouter } from './health.routes.js'
+import { metricsMiddleware } from '../middlewares/metrics.js'
 
 const router = Router()
 
-router.use('/metrics', metricsRouter)
-router.use('/health', healthRouter)
+router.use(metricsMiddleware)
 
-export { router as metricsRouter }
+export { router as metricsRouter, metricsMiddleware }

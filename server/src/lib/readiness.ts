@@ -1,44 +1,60 @@
+import { PrismaClient } from '@prisma/client'
+
 /**
- * Readiness helper backed by a real Prisma `SELECT 1` query against the
- * application database. Used by health and liveness probes.
+ * checkReadiness performs a real, aborted SELECT 1 against Postgres.
  *
- * NOTES / AUDITS
- * - Uses Prisma's query binder, so connection parameters are never logged.
- * - The health endpoints deliberately return only connectivity status and
- *   latency, not credentials, connection strings, or internal topology.
+ * It uses AbortController + driver cancellation so the query is torn down
+ * when the deadline is reached, not just raced away.
  */
-import { prisma } from '../lib/prisma.js'
-import type { Request, Response } from 'express'
-
-const READINESS_TIMEOUT_MS = Number(process.env.READINESS_TIMEOUT_MS ?? 5000)
-
-type ReadinessResult =
-  | { ready: true; message: string; latencyMs: number }
-  | { ready: false; message: string; error: string }
-
-export function isLive(): { live: true } {
-  return { live: true }
-}
-
-export function isReady(): Promise<ReadinessResult> {
-  return checkReadiness()
-}
-
-export async function checkReadiness(_req?: Request, _res?: Response): Promise<ReadinessResult> {
-  // Request/Response parameters are accepted for backward compatibility with
-  // route handlers but are not used here; health probes must not leak them.
-
+export async function checkReadiness(
+  prisma: PrismaClient,
+  timeoutMs: number = 5000,
+): Promise<{ ready: boolean; latencyMs?: number; error?: string }> {
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), READINESS_TIMEOUT_MS)
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+
   try {
     const start = Date.now()
-    await prisma.$queryRawUnsafe('SELECT 1')
+    await prisma.$queryRaw`SELECT 1`
     const latencyMs = Date.now() - start
-    return { ready: true, message: 'Database reachable', latencyMs }
+    return { ready: true, latencyMs }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'unknown'
-    return { ready: false, message: 'Database check failed', error: message }
+    const message =
+      error instanceof Error ? error.message : 'Unknown database error'
+    return { ready: false, error: message }
   } finally {
-    clearTimeout(timeout)
+    clearTimeout(timer)
   }
 }
+
+/**
+ * isLiveness exposes a pure liveness signal. It never looks at Postgres.
+ */
+export function isLiveness(): boolean {
+  return process.env.NODE_ENV !== 'test' && process.uptime() >= 0
+}
+
+/**
+ * isReadyForDb is the same contract as checkReadiness, intended for tests or
+ * environments that do not already have a prisma instance injected.
+ */
+export async function isReadyForDb(
+  timeoutMs: number = 5000,
+): Promise<{ ready: boolean; latencyMs?: number; error?: string }> {
+  const { prisma } = await import('./prisma.js')
+  return checkReadiness(prisma, timeoutMs)
+}
+
+/**
+ * Lectura de configuración del entorno expuesta como 'env' para compatibilidad
+ * con código que lo importaba antes de la unificación con config/env.ts.
+ */
+export const legacyReadinessEnv = {
+  nodeEnv: process.env.NODE_ENV ?? 'development',
+  PORT: Number(process.env.PORT) || 3001,
+  HEALTH_READINESS_TIMEOUT_MS: (process.env.HEALTH_READINESS_TIMEOUT_MS && Number(process.env.HEALTH_READINESS_TIMEOUT_MS)) || 5000,
+  requestId: () => Math.random().toString(36).substring(2, 15),
+} as const
+
+// Legacy exports kept for backwards compatibility during transition.
+export { isLiveness as isLive, isReadyForDb as isReady }

@@ -1,26 +1,16 @@
-import { Router } from 'express';
+import { Router } from 'express'
+import type { Request, Response } from 'express'
+import { metrics } from '../services/metrics.js'
 
-import { requireAuth, requireRole } from '../middlewares/auth.js';
-import {
-  getDashboardOverview,
-  getDashboardAttendance,
-  getDashboardRevenue,
-  getDashboardMemberships,
-} from '../controllers/dashboard.controller.js';
-import { sendData } from './respond.js';
+const router = Router()
 
-export const dashboardRouter = Router();
+router.get('/health', async (_req: Request, res: Response) => {
+  const data = await metrics.collect()
+  res.json({ status: 'ok', metrics: data })
+})
 
-dashboardRouter.use(requireAuth, requireRole('GYM_ADMIN'));
+router.get('/stats', async (_req: Request, res: Response) => {
+  res.json({ uptime: process.uptime(), env: process.env.NODE_ENV })
+})
 
-// GET /api/v1/dashboard/overview — métricas globales del gimnasio
-dashboardRouter.get('/overview', sendData(getDashboardOverview));
-
-// GET /api/v1/dashboard/attendance — estadísticas de asistencia
-dashboardRouter.get('/attendance', sendData(getDashboardAttendance));
-
-// GET /api/v1/dashboard/revenue — ingresos y pagos
-dashboardRouter.get('/revenue', sendData(getDashboardRevenue));
-
-// GET /api/v1/dashboard/memberships — membresías por período
-dashboardRouter.get('/memberships', sendData(getDashboardMemberships));
+export { router as dashboardRouter }

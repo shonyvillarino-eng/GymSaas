@@ -1,16 +1,16 @@
-import type { PrismaClient } from '@prisma/client'
+// health/status.legacy.ts
+// Retorna el estado del servidor sin detalles de la BD.
+import { Router } from 'express'
+import type { Request, Response } from 'express'
 
-export async function getReadiness(prisma: PrismaClient, timeoutMs = 5000) {
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    const start = Date.now()
-    await prisma.$queryRawUnsafe('SELECT 1')
-    const latencyMs = Date.now() - start
-    return { ready: true, latencyMs }
-  } catch {
-    return { ready: false }
-  } finally {
-    clearTimeout(timeout)
-  }
-}
+const router = Router()
+
+router.get('/status', (_req: Request, res: Response) => {
+  res.status(200).json({
+    status: 'ok',
+    uptimeMs: Math.round(process.uptime() * 1000),
+    timestamp: new Date().toISOString(),
+  })
+})
+
+export { router as healthRouter }

@@ -1,17 +1,17 @@
-import type { Request, Response } from 'express';
-import type { Prisma } from '@prisma/client';
+import type { Request, Response } from 'express'
+import type { Prisma } from '@prisma/client'
 
-import { prisma } from '../lib/prisma.js';
-import { AppError } from '../middlewares/errorHandler.js';
-import { clientIp, writeAudit } from '../services/audit.js';
-import { idParamSchema, parseOrThrow } from '../validations/schemas.js';
+import { prisma } from '../lib/prisma.js'
+import { AppError } from '../middlewares/errorHandler.js'
+import { clientIp, writeAudit } from '../services/audit.js'
+import { idParamSchema, parseOrThrow } from '../validations/schemas.js'
 import {
   attendanceListQuerySchema,
   eligibilityQuerySchema,
   manualCheckInSchema,
   memberAttendanceQuerySchema,
   qrCheckInSchema,
-} from '../validations/attendance.schemas.js';
+} from '../validations/attendance.schemas.js'
 import {
   attendanceSelect,
   evaluateAccess,
@@ -22,21 +22,27 @@ import {
   qrPayload,
   registerCheckIn,
   weeklyBuckets,
-} from '../services/attendance.js';
-import { gymCalendarDate, startOfGymDate } from '../services/financial.js';
-import { loadGymPreferences } from '../services/gymPreferences.js';
+} from '../services/attendance.js'
+import { gymCalendarDate, startOfGymDate } from '../services/financial.js'
+import { loadGymPreferences } from '../services/gymPreferences.js'
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
 
 /** Gym always comes from the authenticated session, never from the request. */
-function gymIdFromSession(req: Request) {
-  if (!req.auth?.gymId) throw new AppError('Gym access required', 403, { code: 'FORBIDDEN' });
-  return req.auth.gymId;
+function gymIdFromSession(req: Request): string {
+  if (!req.auth?.gymId) throw new AppError('Gym access required', 403, { code: 'FORBIDDEN' })
+  return req.auth.gymId
 }
 
-async function audit(req: Request, gymId: string, entityType: string, entityId: string, newValues: Prisma.InputJsonValue) {
+async function audit(
+  req: Request,
+  gymId: string,
+  entityType: string,
+  entityId: string,
+  newValues: Prisma.InputJsonValue,
+): Promise<void> {
   await writeAudit({
     gymId,
     userId: req.auth?.userId ?? null,
@@ -46,63 +52,71 @@ async function audit(req: Request, gymId: string, entityType: string, entityId: 
     newValues,
     ipAddress: clientIp(req),
     userAgent: req.get('user-agent') ?? null,
-  });
+  })
 }
 
 /** Only justified exceptions are audited: they are administrative decisions. */
 async function auditException(
   req: Request,
   gymId: string,
-  attendance: { id: string; memberId: string; method: string; result: string; exceptionReason: string | null },
-) {
-  if (attendance.result !== 'EXCEPTION') return;
+  attendance: { id: string; memberId: string; method: string; exceptionReason: string | null; result: string },
+): Promise<void> {
+  if (attendance.result !== 'EXCEPTION') return
   await audit(req, gymId, 'AttendanceException', attendance.id, {
     memberId: attendance.memberId,
     method: attendance.method,
     reason: attendance.exceptionReason,
     result: attendance.result,
-  });
+  })
 }
 
 /** Membership attendance history of the authenticated member (self-service). */
 async function membershipForSessionUser(req: Request, gymId: string) {
+  const auth = req.auth
+  if (!auth) throw new AppError('Authentication required', 401)
   const profile = await prisma.memberProfile.findFirst({
-    where: { gymId, userId: req.auth!.userId },
+    where: { gymId, userId: auth.userId },
     select: { id: true, status: true, user: { select: { fullName: true, avatarUrl: true } } },
-  });
-  if (!profile) throw new AppError('Member profile not found', 404);
-  return profile;
+  })
+  if (!profile) throw new AppError('Member profile not found', 404)
+  return profile
 }
 
 /**
  * INSTRUCTOR access is limited to members currently assigned to them.
  * Checked in the database on every request — never taken from the client.
  */
-async function assertInstructorCanSeeMember(req: Request, gymId: string, memberId: string) {
-  if (req.auth?.role === 'GYM_ADMIN') return;
-  if (req.auth?.role !== 'INSTRUCTOR') {
-    throw new AppError('Insufficient permissions', 403, { code: 'FORBIDDEN' });
+async function assertInstructorCanSeeMember(req: Request, gymId: string, memberId: string): Promise<void> {
+  const auth = req.auth
+  if (!auth) throw new AppError('Authentication required', 401)
+  if (auth.role === 'GYM_ADMIN') return
+  if (auth.role !== 'INSTRUCTOR') {
+    throw new AppError('Insufficient permissions', 403, { code: 'FORBIDDEN' })
   }
   const instructor = await prisma.instructorProfile.findFirst({
-    where: { gymId, userId: req.auth.userId },
+    where: { gymId, userId: auth.userId },
     select: { id: true },
-  });
-  if (!instructor) throw new AppError('Instructor profile not found', 403, { code: 'FORBIDDEN' });
+  })
+  if (!instructor) throw new AppError('Instructor profile not found', 403, { code: 'FORBIDDEN' })
   const assignment = await prisma.instructorMember.findFirst({
     where: { gymId, instructorId: instructor.id, memberId, isActive: true },
     select: { id: true },
-  });
+  })
   if (!assignment) {
-    throw new AppError('You can only consult members assigned to you', 403, { code: 'NOT_ASSIGNED' });
+    throw new AppError('You can only consult members assigned to you', 403, { code: 'NOT_ASSIGNED' })
   }
 }
 
-function rangeFilter(from: string | undefined, to: string | undefined, timezone: string) {
-  if (!from && !to) return undefined;
+function rangeFilter(
+  from: string | undefined,
+  to: string | undefined,
+  timezone: string,
+): { gte?: Date; lte?: Date } | undefined {
+  if (!from && !to) return undefined
   return {
     ...(from ? { gte: startOfGymDate(from, timezone) } : {}),
     ...(to ? { lte: new Date(startOfGymDate(to, timezone).getTime() + 86_400_000 - 1) } : {}),
-  };
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -113,26 +127,33 @@ function rangeFilter(from: string | undefined, to: string | undefined, timezone:
  * GET /attendance/eligibility?memberId=... | ?code=...
  * Read-only preview used by the reception desk before recording an entry.
  */
-export async function getEligibility(req: Request, res: Response) {
-  const gymId = gymIdFromSession(req);
-  const query = parseOrThrow(eligibilityQuerySchema, req.query);
-  const gym = await loadGymPreferences(gymId);
-  if (!gym) throw new AppError('Gym not found', 404);
+export async function getEligibility(req: Request, res: Response): Promise<void> {
+  const authReq = req
+  const gymId = gymIdFromSession(authReq)
+  const query = parseOrThrow(eligibilityQuerySchema, authReq.query)
 
-  const memberId = query.code ? (await memberFromQrToken(gymId, query.code)).id : (query.memberId as string);
-  const member = await findMemberForCheckIn(prisma, gymId, memberId);
-  const now = new Date();
-  const decision = evaluateAccess(member, gym.preferences.attendancePolicy, now);
+  const gym = await loadGymPreferences(gymId)
+  if (!gym) throw new AppError('Gym not found', 404)
 
-  const { start: dayStart, end: dayEnd } = await gymDayRange(gymId);
+  const memberId = query.code ? (await memberFromQrToken(gymId, query.code)).id : query.memberId
+  if (!memberId) throw new AppError('Provide either memberId or code', 400)
+
+  const member = await findMemberForCheckIn(prisma, gymId, memberId)
+  const now = new Date()
+  const decision = evaluateAccess(member, gym.preferences.attendancePolicy, now)
+
+  const { start: dayStart, end: dayEnd } = await gymDayRange(gymId)
+
   const [lastAttendance, todayCount] = await Promise.all([
     prisma.attendance.findFirst({
       where: { gymId, memberId, deletedAt: null },
       orderBy: { checkInTime: 'desc' },
       select: { id: true, checkInTime: true, method: true, result: true },
     }),
-    prisma.attendance.count({ where: { gymId, memberId, deletedAt: null, checkInTime: { gte: dayStart, lte: dayEnd } } }),
-  ]);
+    prisma.attendance.count({
+      where: { gymId, memberId, deletedAt: null, checkInTime: { gte: dayStart, lte: dayEnd } },
+    }),
+  ])
 
   res.json({
     data: {
@@ -140,76 +161,89 @@ export async function getEligibility(req: Request, res: Response) {
       lastAttendance,
       todayCount,
       duplicateWindowMinutes: gym.preferences.attendanceDuplicateToleranceMinutes,
-      gym: { name: gym.name, currency: gym.currency, timezone: gym.timezone, logoUrl: gym.logoUrl },
+      gym: {
+        name: gym.name,
+        currency: gym.currency,
+        timezone: gym.timezone,
+        logoUrl: gym.logoUrl,
+      },
       qr: query.code ? { scanned: true } : { scanned: false },
     },
-  });
+  })
 }
 
 /* ------------------------------------------------------------------ */
 /* Check-in                                                            */
 /* ------------------------------------------------------------------ */
 
-export async function manualCheckIn(req: Request, res: Response) {
-  const gymId = gymIdFromSession(req);
-  const input = parseOrThrow(manualCheckInSchema, req.body);
+export async function manualCheckIn(req: Request, res: Response): Promise<void> {
+  const authReq = req
+  const gymId = gymIdFromSession(authReq)
+  const input = parseOrThrow(manualCheckInSchema, authReq.body)
+
   const result = await registerCheckIn({
     gymId,
     memberId: input.memberId,
     method: 'MANUAL',
-    userId: req.auth!.userId,
+    userId: authReq.auth?.userId ?? null,
     notes: input.notes ?? null,
     exceptionReason: input.exceptionReason ?? null,
-  });
-  await auditException(req, gymId, result.attendance);
-  res.status(201).json({ data: result });
+  })
+
+  await auditException(authReq, gymId, result.attendance)
+  res.status(201).json({ data: result })
 }
 
-export async function qrCheckIn(req: Request, res: Response) {
-  const gymId = gymIdFromSession(req);
-  const input = parseOrThrow(qrCheckInSchema, req.body);
-  const resolved = await memberFromQrToken(gymId, input.code);
+export async function qrCheckIn(req: Request, res: Response): Promise<void> {
+  const authReq = req
+  const gymId = gymIdFromSession(authReq)
+  const input = parseOrThrow(qrCheckInSchema, authReq.body)
+
+  const resolved = await memberFromQrToken(gymId, input.code)
   const result = await registerCheckIn({
     gymId,
     memberId: resolved.id,
     method: 'QR',
-    userId: req.auth!.userId,
+    userId: authReq.auth?.userId ?? null,
     notes: input.notes ?? null,
     exceptionReason: input.exceptionReason ?? null,
-  });
-  await auditException(req, gymId, result.attendance);
-  res.status(201).json({ data: result });
+  })
+
+  await auditException(authReq, gymId, result.attendance)
+  res.status(201).json({ data: result })
 }
 
 /* ------------------------------------------------------------------ */
 /* History                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function listAttendance(req: Request, res: Response) {
-  const gymId = gymIdFromSession(req);
-  const query = parseOrThrow(attendanceListQuerySchema, req.query);
-  const gym = await prisma.gym.findUniqueOrThrow({ where: { id: gymId }, select: { timezone: true } });
+export async function listAttendance(req: Request, res: Response): Promise<void> {
+  const authReq = req
+  const gymId = gymIdFromSession(authReq)
+  const query = parseOrThrow(attendanceListQuerySchema, authReq.query)
 
-  const where: Prisma.AttendanceWhereInput = {
+  const gym = await prisma.gym.findUniqueOrThrow({ where: { id: gymId }, select: { timezone: true } })
+
+  const where = {
     gymId,
     deletedAt: null,
     ...(query.memberId ? { memberId: query.memberId } : {}),
     ...(query.method !== 'all' ? { method: query.method } : {}),
     ...(query.result !== 'all' ? { result: query.result } : {}),
-    ...(rangeFilter(query.from, query.to, gym.timezone)
-      ? { checkInTime: rangeFilter(query.from, query.to, gym.timezone) }
-      : {}),
+    ...(query.from || query.to ? { checkInTime: rangeFilter(query.from, query.to, gym.timezone) } : {}),
     ...(query.search
       ? {
           member: {
-            OR: [
-              { user: { fullName: { contains: query.search, mode: 'insensitive' } } },
-              { documentNumber: { contains: query.search, mode: 'insensitive' } },
-            ],
+            is: {
+              OR: [
+                { user: { is: { fullName: { contains: query.search, mode: 'insensitive' as const } } } },
+                { documentNumber: { contains: query.search, mode: 'insensitive' as const } },
+              ],
+            },
           },
         }
       : {}),
-  };
+  }
 
   const [total, rows] = await prisma.$transaction([
     prisma.attendance.count({ where }),
@@ -220,7 +254,7 @@ export async function listAttendance(req: Request, res: Response) {
       take: query.pageSize,
       select: attendanceSelect,
     }),
-  ]);
+  ])
 
   res.json({
     data: rows,
@@ -230,26 +264,30 @@ export async function listAttendance(req: Request, res: Response) {
       total,
       totalPages: Math.max(1, Math.ceil(total / query.pageSize)),
     },
-  });
+  })
 }
 
-export async function getAttendance(req: Request, res: Response) {
-  const gymId = gymIdFromSession(req);
-  const id = parseOrThrow(idParamSchema, req.params.id);
+export async function getAttendance(req: Request, res: Response): Promise<void> {
+  const authReq = req
+  const gymId = gymIdFromSession(authReq)
+  const id = parseOrThrow(idParamSchema, authReq.params.id)
+
   const record = await prisma.attendance.findFirst({
     where: { id, gymId, deletedAt: null },
     select: attendanceSelect,
-  });
-  if (!record) throw new AppError('Attendance record not found', 404);
-  res.json({ data: record });
+  })
+  if (!record) throw new AppError('Attendance record not found', 404)
+  res.json({ data: record })
 }
 
 /** GET /attendance/member/:memberId — admin, or the instructor it is assigned to. */
-export async function memberAttendance(req: Request, res: Response) {
-  const gymId = gymIdFromSession(req);
-  const memberId = parseOrThrow(idParamSchema, req.params.memberId);
-  const query = parseOrThrow(memberAttendanceQuerySchema, req.query);
-  await assertInstructorCanSeeMember(req, gymId, memberId);
+export async function memberAttendance(req: Request, res: Response): Promise<void> {
+  const authReq = req
+  const gymId = gymIdFromSession(authReq)
+  const memberId = parseOrThrow(idParamSchema, authReq.params.memberId)
+  const query = parseOrThrow(memberAttendanceQuerySchema, authReq.query)
+
+  await assertInstructorCanSeeMember(authReq, gymId, memberId)
 
   const member = await prisma.memberProfile.findFirst({
     where: { id: memberId, gymId },
@@ -265,20 +303,20 @@ export async function memberAttendance(req: Request, res: Response) {
         select: { status: true, startDate: true, endDate: true, planNameAtPurchase: true },
       },
     },
-  });
-  if (!member) throw new AppError('Member not found', 404);
+  })
+  if (!member) throw new AppError('Member not found', 404)
 
-  const gym = await prisma.gym.findUniqueOrThrow({ where: { id: gymId }, select: { timezone: true } });
-  const range = rangeFilter(query.from, query.to, gym.timezone);
-  const where: Prisma.AttendanceWhereInput = {
+  const gym = await prisma.gym.findUniqueOrThrow({ where: { id: gymId }, select: { timezone: true } })
+  const where = {
     gymId,
     memberId,
     deletedAt: null,
-    ...(range ? { checkInTime: range } : {}),
-  };
+    ...(query.from || query.to ? { checkInTime: rangeFilter(query.from, query.to, gym.timezone) } : {}),
+  }
 
-  const now = new Date();
-  const monthStart = startOfGymDate(`${gymCalendarDate(now, gym.timezone).slice(0, 7)}-01`, gym.timezone);
+  const now = new Date()
+  const monthStart = startOfGymDate(`${gymCalendarDate(now, gym.timezone).slice(0, 7)}-01`, gym.timezone)
+
   const [total, rows, monthCount, lastVisit, weekTimes] = await Promise.all([
     prisma.attendance.count({ where }),
     prisma.attendance.findMany({
@@ -288,7 +326,9 @@ export async function memberAttendance(req: Request, res: Response) {
       take: query.pageSize,
       select: attendanceSelect,
     }),
-    prisma.attendance.count({ where: { gymId, memberId, deletedAt: null, checkInTime: { gte: monthStart } } }),
+    prisma.attendance.count({
+      where: { gymId, memberId, deletedAt: null, checkInTime: { gte: monthStart } },
+    }),
     prisma.attendance.findFirst({
       where: { gymId, memberId, deletedAt: null },
       orderBy: { checkInTime: 'desc' },
@@ -303,10 +343,10 @@ export async function memberAttendance(req: Request, res: Response) {
       },
       select: { checkInTime: true },
     }),
-  ]);
+  ])
 
-  const times = weekTimes.map((row) => row.checkInTime);
-  const last28 = times.filter((time) => time >= new Date(now.getTime() - 28 * 86_400_000)).length;
+  const times = weekTimes.map((row) => row.checkInTime)
+  const last28 = times.filter((time) => time >= new Date(now.getTime() - 28 * 86_400_000)).length
 
   res.json({
     data: {
@@ -333,20 +373,24 @@ export async function memberAttendance(req: Request, res: Response) {
         totalPages: Math.max(1, Math.ceil(total / query.pageSize)),
       },
     },
-  });
+  })
 }
 
 /** GET /attendance/me — the member's own history. */
-export async function myAttendance(req: Request, res: Response) {
-  const gymId = gymIdFromSession(req);
-  const profile = await membershipForSessionUser(req, gymId);
-  const gym = await prisma.gym.findUniqueOrThrow({ where: { id: gymId }, select: { timezone: true } });
-  const now = new Date();
-  const monthStart = startOfGymDate(`${gymCalendarDate(now, gym.timezone).slice(0, 7)}-01`, gym.timezone);
+export async function myAttendance(req: Request, res: Response): Promise<void> {
+  const authReq = req
+  const gymId = gymIdFromSession(authReq)
+  const profile = await membershipForSessionUser(authReq, gymId)
+
+  const gym = await prisma.gym.findUniqueOrThrow({ where: { id: gymId }, select: { timezone: true } })
+  const now = new Date()
+  const monthStart = startOfGymDate(`${gymCalendarDate(now, gym.timezone).slice(0, 7)}-01`, gym.timezone)
 
   const [total, monthCount, lastVisit, rows, weekTimes] = await Promise.all([
     prisma.attendance.count({ where: { gymId, memberId: profile.id, deletedAt: null } }),
-    prisma.attendance.count({ where: { gymId, memberId: profile.id, deletedAt: null, checkInTime: { gte: monthStart } } }),
+    prisma.attendance.count({
+      where: { gymId, memberId: profile.id, deletedAt: null, checkInTime: { gte: monthStart } },
+    }),
     prisma.attendance.findFirst({
       where: { gymId, memberId: profile.id, deletedAt: null },
       orderBy: { checkInTime: 'desc' },
@@ -367,7 +411,7 @@ export async function myAttendance(req: Request, res: Response) {
       },
       select: { checkInTime: true },
     }),
-  ]);
+  ])
 
   res.json({
     data: {
@@ -381,28 +425,32 @@ export async function myAttendance(req: Request, res: Response) {
         weekly: weeklyBuckets(weekTimes.map((row) => row.checkInTime), gym.timezone, 8),
       },
     },
-  });
+  })
 }
 
 /* ------------------------------------------------------------------ */
 /* Reception dashboard                                                 */
 /* ------------------------------------------------------------------ */
 
-export async function attendanceStats(req: Request, res: Response) {
-  const gymId = gymIdFromSession(req);
-  const now = new Date();
-  const { start: todayStart, end: todayEnd, timezone } = await gymDayRange(gymId);
-  const todayKey = gymCalendarDate(now, timezone);
-  const monthStart = startOfGymDate(`${todayKey.slice(0, 7)}-01`, timezone);
-  const weekStart = new Date(todayStart.getTime() - 6 * 86_400_000);
-  const seriesStart = new Date(todayStart.getTime() - 13 * 86_400_000);
+export async function attendanceStats(req: Request, res: Response): Promise<void> {
+  const authReq = req
+  const gymId = gymIdFromSession(authReq)
+
+  const now = new Date()
+  const { start: todayStart, end: todayEnd, timezone } = await gymDayRange(gymId)
+  const todayKey = gymCalendarDate(now, timezone)
+  const monthStart = startOfGymDate(`${todayKey.slice(0, 7)}-01`, timezone)
+  const weekStart = new Date(todayStart.getTime() - 6 * 86_400_000)
+  const seriesStart = new Date(todayStart.getTime() - 13 * 86_400_000)
 
   const [seriesRows, todayRows, monthCount, recent, withoutValidMembership] = await Promise.all([
     prisma.attendance.findMany({
       where: { gymId, deletedAt: null, checkInTime: { gte: seriesStart } },
       select: { checkInTime: true, method: true, result: true },
     }),
-    prisma.attendance.count({ where: { gymId, deletedAt: null, checkInTime: { gte: todayStart, lte: todayEnd } } }),
+    prisma.attendance.count({
+      where: { gymId, deletedAt: null, checkInTime: { gte: todayStart, lte: todayEnd } },
+    }),
     prisma.attendance.count({ where: { gymId, deletedAt: null, checkInTime: { gte: monthStart } } }),
     prisma.attendance.findMany({
       where: { gymId, deletedAt: null },
@@ -419,22 +467,24 @@ export async function attendanceStats(req: Request, res: Response) {
         },
       },
     }),
-  ]);
+  ])
 
-  const days = new Map<string, number>();
+  const days = new Map<string, number>()
   for (let index = 13; index >= 0; index -= 1) {
-    days.set(gymCalendarDate(new Date(todayStart.getTime() - index * 86_400_000), timezone), 0);
+    days.set(gymCalendarDate(new Date(todayStart.getTime() - index * 86_400_000), timezone), 0)
   }
   for (const row of seriesRows) {
-    const key = gymCalendarDate(row.checkInTime, timezone);
-    if (days.has(key)) days.set(key, (days.get(key) ?? 0) + 1);
+    const key = gymCalendarDate(row.checkInTime, timezone)
+    if (days.has(key)) days.set(key, (days.get(key) ?? 0) + 1)
   }
 
-  const inToday = seriesRows.filter((row) => row.checkInTime >= todayStart && row.checkInTime <= todayEnd);
-  const byMethod = (['MANUAL', 'QR'] as const).map((method) => ({
+  const inToday = seriesRows.filter(
+    (row) => row.checkInTime >= todayStart && row.checkInTime <= todayEnd,
+  )
+  const byMethod = ['MANUAL', 'QR'].map((method) => ({
     method,
     count: inToday.filter((row) => row.method === method).length,
-  }));
+  }))
 
   res.json({
     data: {
@@ -449,7 +499,7 @@ export async function attendanceStats(req: Request, res: Response) {
       recent,
       timezone,
     },
-  });
+  })
 }
 
 /* ------------------------------------------------------------------ */
@@ -459,9 +509,16 @@ export async function attendanceStats(req: Request, res: Response) {
 async function credentialFor(gymId: string, memberId: string) {
   const member = await prisma.memberProfile.findFirst({
     where: { id: memberId, gymId },
-    select: { id: true, qrToken: true, qrTokenCreatedAt: true, qrRevokedAt: true, user: { select: { fullName: true } } },
-  });
-  if (!member) throw new AppError('Member not found', 404);
+    select: {
+      id: true,
+      qrToken: true,
+      qrTokenCreatedAt: true,
+      qrRevokedAt: true,
+      user: { select: { fullName: true } },
+    },
+  })
+  if (!member) throw new AppError('Member not found', 404)
+
   return {
     memberId: member.id,
     fullName: member.user.fullName,
@@ -469,55 +526,64 @@ async function credentialFor(gymId: string, memberId: string) {
     payload: member.qrToken ? qrPayload(member.qrToken) : null,
     createdAt: member.qrTokenCreatedAt,
     revokedAt: member.qrRevokedAt,
-  };
+  }
 }
 
-export async function getMemberCredential(req: Request, res: Response) {
-  const gymId = gymIdFromSession(req);
-  const memberId = parseOrThrow(idParamSchema, req.params.memberId);
-  res.json({ data: await credentialFor(gymId, memberId) });
+export async function getMemberCredential(req: Request, res: Response): Promise<void> {
+  const authReq = req
+  const gymId = gymIdFromSession(authReq)
+  const memberId = parseOrThrow(idParamSchema, authReq.params.memberId)
+  res.json({ data: await credentialFor(gymId, memberId) })
 }
 
-export async function regenerateMemberCredential(req: Request, res: Response) {
-  const gymId = gymIdFromSession(req);
-  const memberId = parseOrThrow(idParamSchema, req.params.memberId);
+export async function regenerateMemberCredential(req: Request, res: Response): Promise<void> {
+  const authReq = req
+  const gymId = gymIdFromSession(authReq)
+  const memberId = parseOrThrow(idParamSchema, authReq.params.memberId)
+
   const current = await prisma.memberProfile.findFirst({
     where: { id: memberId, gymId },
     select: { id: true, qrToken: true },
-  });
-  if (!current) throw new AppError('Member not found', 404);
+  })
+  if (!current) throw new AppError('Member not found', 404)
 
   await prisma.memberProfile.update({
     where: { id: memberId },
     data: { qrToken: generateQrToken(), qrTokenCreatedAt: new Date(), qrRevokedAt: null },
-  });
-  await audit(req, gymId, 'MemberQrCredential', memberId, {
+  })
+
+  await audit(authReq, gymId, 'MemberQrCredential', memberId, {
     action: current.qrToken ? 'REGENERATED' : 'CREATED',
     previousCredentialInvalidated: Boolean(current.qrToken),
-  });
-  res.status(201).json({ data: await credentialFor(gymId, memberId) });
+  })
+
+  res.status(201).json({ data: await credentialFor(gymId, memberId) })
 }
 
-export async function revokeMemberCredential(req: Request, res: Response) {
-  const gymId = gymIdFromSession(req);
-  const memberId = parseOrThrow(idParamSchema, req.params.memberId);
+export async function revokeMemberCredential(req: Request, res: Response): Promise<void> {
+  const authReq = req
+  const gymId = gymIdFromSession(authReq)
+  const memberId = parseOrThrow(idParamSchema, authReq.params.memberId)
+
   const current = await prisma.memberProfile.findFirst({
     where: { id: memberId, gymId },
     select: { id: true, qrToken: true },
-  });
-  if (!current) throw new AppError('Member not found', 404);
-  if (!current.qrToken) throw new AppError('This member has no active credential.', 409);
+  })
+  if (!current) throw new AppError('Member not found', 404)
+  if (!current.qrToken) throw new AppError('This member has no active credential.', 409)
 
   await prisma.memberProfile.update({
     where: { id: memberId },
     data: { qrToken: null, qrRevokedAt: new Date() },
-  });
-  await audit(req, gymId, 'MemberQrCredential', memberId, { action: 'REVOKED' });
-  res.json({ data: await credentialFor(gymId, memberId) });
+  })
+
+  await audit(authReq, gymId, 'MemberQrCredential', memberId, { action: 'REVOKED' })
+  res.json({ data: await credentialFor(gymId, memberId) })
 }
 
-export async function getMyCredential(req: Request, res: Response) {
-  const gymId = gymIdFromSession(req);
-  const profile = await membershipForSessionUser(req, gymId);
-  res.json({ data: await credentialFor(gymId, profile.id) });
+export async function getMyCredential(req: Request, res: Response): Promise<void> {
+  const authReq = req
+  const gymId = gymIdFromSession(authReq)
+  const profile = await membershipForSessionUser(authReq, gymId)
+  res.json({ data: await credentialFor(gymId, profile.id) })
 }

@@ -81,3 +81,11 @@ async function uploadTenantImage(prefix: string, file: { buffer: Buffer; mimetyp
   }))
   return { key, url: `${publicBaseUrl}/${key}` }
 }
+
+// Configuración de almacenamiento por defecto para desarrollo local
+export const DEFAULT_STORAGE_CONFIG = {
+  maxFileSize: MAX_LOGO_BYTES,
+  allowedMimeTypes: Array.from(allowedMimeTypes.keys()),
+  supportedImageTypes: ['png', 'jpg', 'webp'],
+} as const
+

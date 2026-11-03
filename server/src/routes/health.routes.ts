@@ -1,12 +1,13 @@
 import { Router } from 'express'
 import type { Request, Response } from 'express'
-
-import { checkReadiness } from '../lib/health.js'
+import { prisma } from '../lib/prisma.js'
 import { env } from '../config/env.js'
+import { checkReadiness } from '../lib/readiness.js'
 
-const router = Router()
+const TIMEOUT_MS = env.HEALTH_READINESS_TIMEOUT_MS ?? 5000
+export const healthRouter = Router()
 
-router.get('/', (_req: Request, res: Response) => {
+healthRouter.get('/', (_req: Request, res: Response) => {
   res.status(200).json({
     status: 'ok',
     uptimeMs: Math.round(process.uptime() * 1000),
@@ -15,7 +16,7 @@ router.get('/', (_req: Request, res: Response) => {
   })
 })
 
-router.get('/live', (_req: Request, res: Response) => {
+healthRouter.get('/live', (_req: Request, res: Response) => {
   res.status(200).json({
     status: 'alive',
     uptimeMs: Math.round(process.uptime() * 1000),
@@ -23,17 +24,14 @@ router.get('/live', (_req: Request, res: Response) => {
   })
 })
 
-router.post('/ready', async (_req: Request, res: Response) => {
-  const readiness = await checkReadiness()
+healthRouter.post('/ready', async (_req: Request, res: Response) => {
+  const readiness = await checkReadiness(prisma, TIMEOUT_MS)
   res.status(readiness.ready ? 200 : 503).json({
     status: readiness.ready ? 'ok' : 'error',
     ready: readiness.ready,
     timestamp: new Date().toISOString(),
-    message: readiness.message,
     database: readiness.ready
       ? { connected: true, latencyMs: readiness.latencyMs }
       : { connected: false, error: readiness.error },
   })
 })
-
-export { router as healthRouter }

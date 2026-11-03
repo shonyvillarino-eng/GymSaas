@@ -13,7 +13,6 @@ import type { Preferences } from './gymPreferences.js';
  * cookie), never from a `memberId` sent by the client: there is no parameter
  * that could point at somebody else's record.
  */
-
 export interface PortalMember {
   id: string;
   gymId: string;
@@ -25,6 +24,12 @@ export interface PortalMember {
   birthDate: Date | null;
   address: string | null;
   user: { fullName: string; email: string | null; phone: string | null; avatarUrl: string | null };
+}
+
+export interface PortalSession {
+  gymId: string;
+  userId: string;
+  member: PortalMember;
 }
 
 const portalMemberSelect = {
@@ -39,12 +44,6 @@ const portalMemberSelect = {
   address: true,
   user: { select: { fullName: true, email: true, phone: true, avatarUrl: true } },
 } as const;
-
-export interface PortalSession {
-  gymId: string;
-  userId: string;
-  member: PortalMember;
-}
 
 /**
  * Resolves the member profile of the authenticated session.
@@ -306,4 +305,3 @@ export async function memberBalance(gymId: string, memberId: string) {
     openCount: obligations.filter((row) => obligationBalance(row.originalAmount, row.paidAmount).gt(0)).length,
   };
 }
-

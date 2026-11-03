@@ -1,0 +1,95 @@
+// Schema for Gym Management SaaS, generado desde README.md
+// Úsese solo cuando no haya acceso a la BD real (por ejemplo, en CI
+// o en entornos de prueba aislamiento).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// Modelos extraídos de README.md:
+// - Auth: login, registro, token, sesión.
+// - Usuario: usuario, sesión, perfil.
+// - Instructor: instructor, lista de instructores.
+// - Socio: socio, suscripción, membresía.
+// - Gimnasio: gimnasio, membresía, suscripción.
+// - Entrenamiento: registro, entrenamiento.
+// - Rutina: rutina, lista de rutinas.
+// - Ejercicio: ejercicio, lista de ejercicios.
+
+// Modelo auxiliar para los usuarios:
+model User {
+  userId  String   @id @default(uuid())
+  email   String?
+  nombre  String?
+  apellido  String?
+  telefono  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Modelo auxiliar para los instructores:
+model Instructor {
+  instructorId  String   @id @default(uuid())
+  nombre   String?
+  apellido  String?
+  email    String?
+  telefono  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Modelo auxiliar para los socios:
+model Member {
+  memberId  String   @id @default(uuid())
+  nombre    String?
+  apellido  String?
+  email     String?
+  telefono   String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// Modelo auxiliar para las membresías:
+model Membership {
+  membershipId String @id @default(uuid())
+  nombre       String?
+  descripcion  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// Modelo auxiliar para las suscripciones:
+model Subscription {
+  subscriptionId String @id @default(uuid())
+  socio          String?
+  plan           String?
+  precio         Float?
+  fechaInicio    DateTime?
+  fechaFin       DateTime?
+  estado         String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+// Modelo auxiliar para las rutinas:
+model Routine {
+  routineId String @id @default(uuid())
+  nombre    String?
+  descripcion String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// Modelo auxiliar para los ejercicios:
+model Exercise {
+  exerciseId String @id @default(uuid())
+  nombre     String?
+  descripcion String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

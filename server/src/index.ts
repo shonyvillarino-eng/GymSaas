@@ -1,83 +1,72 @@
-import { createApp } from './app.js';
-import { env } from './config/env.js';
-import { prisma } from './lib/prisma.js';
-import { startNotificationSweep } from './services/notifications.js';import { checkReadiness } from './lib/readiness.js'
-;
+import { createApp } from './app.js'
+import { env } from './config/env.js'
+import { prismaClient } from './lib/prisma.js'
+import { startNotificationSweep } from './services/notifications.js'
 
-const app = createApp();
+const app = createApp()
 
-/**
- * Membership lifecycle sweep.
- *
- * `running` prevents a slow sweep from overlapping with the next tick. The
- * updates are idempotent (a status change is a no-op once applied), so several
- * instances may run them without corrupting data; the (status, endDate) and
- * (status, startDate) indexes keep each tick cheap.
- */
-let running = false;
+let running = false
 
+// Membership lifecycle sweep
 async function sweepMembershipLifecycle() {
-  if (running) return;
-  running = true;
-  const now = new Date();
+  if (running) return
+  running = true
+  const now = new Date()
+
   try {
-    await prisma.memberSubscription.updateMany({
-      where: { status: 'ACTIVE', endDate: { lt: now } },
-      data: { status: 'EXPIRED' },
-    });
-    await prisma.memberSubscription.updateMany({
+    await prismaClient.memberProfile.updateMany({
+      where: { status: 'ACTIVE', joinDate: { lt: now } },
+      data: { status: 'INACTIVE' },
+    })
+    await prismaClient.memberSubscription.updateMany({
       where: { status: 'PENDING', startDate: { lte: now }, endDate: { gte: now } },
       data: { status: 'ACTIVE' },
-    });
+    })
   } catch (error) {
-    console.error(
-      JSON.stringify({
-        level: 'error',
-        event: 'membership_lifecycle_failed',
-        message: error instanceof Error ? error.message : 'unknown',
-      }),
-    );
+    console.error(JSON.stringify({
+      level: 'error',
+      event: 'membership_lifecycle_failed',
+      message: error instanceof Error ? error.message : 'unknown',
+    }))
   } finally {
-    running = false;
+    running = false
   }
 }
 
-const expirationTimer =
-  env.NODE_ENV === 'test'
-    ? null
-    : setInterval(() => {
-        void sweepMembershipLifecycle();
-      }, 60_000);
-expirationTimer?.unref();
+const expirationTimer = env.NODE_ENV === 'test' ? null : setInterval(() => {
+  void sweepMembershipLifecycle()
+}, 60_000)
 
-const stopNotificationSweep =
-  env.NODE_ENV === 'test' ? null : startNotificationSweep();
+if (expirationTimer) expirationTimer.unref()
+
+const stopNotificationSweep = env.NODE_ENV === 'test' ? null : startNotificationSweep()
 
 const server = app.listen(env.PORT, () => {
-  console.log(`✅ API listening on http://localhost:${env.PORT}/api/v1`);
-  console.log(`   Health: http://localhost:${env.PORT}/api/v1/health`);
-  console.log(`   Live:   http://localhost:${env.PORT}/api/v1/health/live`);
-  console.log(`   Env:    ${env.NODE_ENV}`);
-  if (env.NODE_ENV === 'development') {
-    void checkReadiness().then((readiness) => console.log(JSON.stringify({ readiness }, null, 2)));
-  }
+  console.log(`🚀 Server running on http://localhost:${env.PORT}`)
+  console.log(`   Health:  http://localhost:${env.PORT}/health`)
+  console.log(`   Ready:   http://localhost:${env.PORT}/ready`)
+  console.log(`   Metrics: http://localhost:${env.PORT}/metrics`)
+})
 
-});
-
-let shuttingDown = false;
+let shuttingDown = false
 
 function shutdown(signal: string) {
-  if (shuttingDown) return;
-  shuttingDown = true;
-  if (expirationTimer) clearInterval(expirationTimer);
-  stopNotificationSweep?.();
-  console.log(`\n${signal} received, shutting down gracefully...`);
+  if (shuttingDown) return
+  shuttingDown = true
+
+  if (expirationTimer) clearInterval(expirationTimer)
+  stopNotificationSweep?.()
+  console.log(`\n${signal} received. Shutting down gracefully...`)
 
   server.close(() => {
-    void prisma.$disconnect().finally(() => process.exit(0));
-  });
-  setTimeout(() => process.exit(1), 10_000).unref();
+    void prismaClient.$disconnect().then(() => process.exit(0))
+  })
+
+  setTimeout(() => {
+    console.error('Forced shutdown after timeout')
+    process.exit(1)
+  }, 10_000).unref()
 }
 
-process.on('SIGINT', () => shutdown('SIGINT'));
-process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'))
+process.on('SIGTERM', () => shutdown('SIGTERM'))

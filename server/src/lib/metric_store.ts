@@ -1,4 +1,2 @@
-import { metricsRouter, type MetricEntry, type MetricsSnapshot } from './metrics.js'
-
-export { metricsRouter }
-export type { MetricEntry, MetricsSnapshot }
+export * from './metrics.js'
+export * from '../middlewares/metrics.js'
