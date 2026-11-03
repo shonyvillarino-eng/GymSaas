@@ -29,6 +29,7 @@ const SECRET_KEY_TOKENS = new Set([
   'session',
 ])
 
+/* eslint-disable regexp/no-obscure-name */
 const TSTAMP_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z?$/
 
 function isLikelySecretKey(key: string): boolean {
@@ -90,6 +91,14 @@ export function requestId(req?: Request): string | null {
   return (req as unknown as { requestId?: string }).requestId ?? null
 }
 
+export type Env = { NODE_ENV: 'development' | 'production' | 'test' }
+
+export function getNodeEnv(): Env {
+  return { NODE_ENV: (process.env?.NODE_ENV as Env['NODE_ENV']) || 'development' }
+}
+
+export const env = getNodeEnv()
+
 export function createLogEntry(ctx: LogContext): Omit<LogContext, 'requestId'> & {
   'trace.id'?: string | null
   'event.id'?: string
@@ -106,7 +115,7 @@ export function createLogEntry(ctx: LogContext): Omit<LogContext, 'requestId'> &
     message?: string
   } = {
     level: ctx.level,
-    env: ctx.env,
+    env: ctx.env ?? env.NODE_ENV, // eslint-disable-line @typescript-eslint/naming-conflict
     service: ctx.service,
     'trace.id': requestId,
     method: ctx.method,
@@ -126,4 +135,8 @@ export const DEBUG: LogLevel = 'debug'
 export const INFO: LogLevel = 'info'
 export const WARN: LogLevel = 'warn'
 export const ERROR: LogLevel = 'error'
+
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+export const env: Env = getNodeEnv()
+
 

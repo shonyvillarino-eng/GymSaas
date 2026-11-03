@@ -13,13 +13,18 @@ import { apiRouter } from './routes/index.js'
 import { notFoundHandler } from './middlewares/notFound.js'
 import { errorHandler } from './middlewares/errorHandler.js'
 import { metricsMiddleware } from './lib/metrics.js'
-import { readinessHandler } from './lib/readiness.js'
+import { checkReadiness } from './lib/readiness.js'
 
 const SLOW_REQUEST_MS = Number(process.env.SLOW_REQUEST_MS ?? 1000)
 
 function requestContext(req: Request, res: Response, next: express.NextFunction) {
   const incoming = req.get('x-request-id')
-  const requestId = incoming && incoming.length <= 100 ? incoming : randomUUID()
+  let requestId: string
+  if ((incoming ?? '').length > 0 && (incoming?.length ?? 0) <= 100) {
+    requestId = String(incoming)
+  } else {
+    requestId = randomUUID()
+  }
   (req as Request & { requestId?: string }).requestId = requestId
   res.setHeader('X-Request-Id', requestId)
 
@@ -90,22 +95,24 @@ export function createApp(): Express {
     })
   )
 
-  app.get('/health', (_req: Request, res: Response) => {
-    res.status(200).json({
-      status: 'ok',
-      service: 'gym-saas-api',
-      timestamp: new Date().toISOString()
-    })
-  })
-
+  
+  app.use(metricsMiddleware)
+  app.use('/api/v1', apiRouter)
   app.get('/health/live', (_req: Request, res: Response) => {
     res.status(200).json({ status: 'ok', service: 'gym-saas-api', version: 'v1' })
   })
-
-  app.get('/api/v1/health', readinessHandler)
-
-  app.use(metricsMiddleware)
-  app.use('/api/v1', apiRouter)
+  app.get('/api/v1/health/ready', async (_req, res) => {
+    const ready = await checkReadiness()
+    res.status(ready.ready ? 200 : 503).json({
+      status: ready.ready ? 'ok' : 'error',
+      ready: ready.ready,
+      timestamp: new Date().toISOString(),
+      message: ready.ready ? 'Database reachable' : 'Database check failed',
+      database: ready.ready
+        ? { connected: true, latencyMs: ready.latencyMs }
+        : { connected: false, error: ready.error },
+    })
+  })
   app.use(notFoundHandler)
   app.use(errorHandler)
   return app

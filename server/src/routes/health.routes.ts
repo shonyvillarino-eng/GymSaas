@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import type { Request, Response } from 'express'
 
-import { isLive, isReady, checkReadiness } from '../lib/health.js'
+import { checkReadiness } from '../lib/health.js'
 import { env } from '../config/env.js'
 
 const router = Router()
@@ -23,9 +23,17 @@ router.get('/live', (_req: Request, res: Response) => {
   })
 })
 
-router.get('/ready', async (req: Request, res: Response) => {
-  const payload = await checkReadiness(req, res)
-  res.status(payload.status === 'ok' ? 200 : 503).json(payload)
+router.post('/ready', async (_req: Request, res: Response) => {
+  const readiness = await checkReadiness()
+  res.status(readiness.ready ? 200 : 503).json({
+    status: readiness.ready ? 'ok' : 'error',
+    ready: readiness.ready,
+    timestamp: new Date().toISOString(),
+    message: readiness.message,
+    database: readiness.ready
+      ? { connected: true, latencyMs: readiness.latencyMs }
+      : { connected: false, error: readiness.error },
+  })
 })
 
 export { router as healthRouter }

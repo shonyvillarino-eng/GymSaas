@@ -1,30 +1,12 @@
-import { Router, type Request, type Response } from 'express'
+import { Router } from 'express'
+import type { Request, Response } from 'express'
 
-import { getMetrics, clearMetrics } from '../lib/metrics.js'
-import { env } from '../config/env.js'
+import { metricsRouter } from '../lib/metrics.js'
+import { healthRouter } from './health.routes.js'
 
 const router = Router()
 
-router.get('/metrics', (_req: Request, res: Response) => {
-  const snap = getMetrics()
-  res.status(200).json({
-    requestCount: snap.requestCount,
-    errorCount: snap.errorCount,
-    slowCount: snap.slowCount,
-    latencyAvgMs: snap.requestCount > 0
-      ? Math.round(snap.latencySumMs / snap.requestCount)
-      : null,
-    latencyMinMs: snap.latencyMinMs,
-    latencyMaxMs: snap.latencyMaxMs,
-    truncated: snap.truncated,
-    windowStartMs: snap.entries[0]?.timestamp ?? null,
-    windowEndMs: snap.entries[snap.entries.length - 1]?.timestamp ?? null,
-  })
-})
-
-router.post('/metrics/clear', (_req: Request, res: Response) => {
-  clearMetrics()
-  res.status(200).json({ cleared: true })
-})
+router.use('/metrics', metricsRouter)
+router.use('/health', healthRouter)
 
 export { router as metricsRouter }

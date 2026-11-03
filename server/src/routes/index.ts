@@ -1,10 +1,54 @@
 import { Router } from 'express'
-import type { Request, Response } from 'express'
 
 import { healthRouter } from './health.js'
 import { metricsRouter } from './metrics.routes.js'
+import { authRouter } from './auth.routes.js'
+import { usersRouter } from './users.routes.js'
+import { gymsRouter } from './gyms.routes.js'
+import { gymRouter } from './gym.routes.js'
+import { membersRouter } from './members.routes.js'
+import { memberRoutinesRouter } from './member-routines.routes.js'
+import { instructorsRouter } from './instructors.routes.js'
+import { membershipPlansRouter } from './membership-plans.routes.js'
+import { subscriptionsRouter } from './subscriptions.routes.js'
+import { paymentsRouter } from './payments.routes.js'
+import { attendanceRouter } from './attendance.routes.js'
+import { routinesRouter } from './routines.routes.js'
+import { exercisesRouter } from './exercises.routes.js'
+import { financialObligationsRouter } from './financial-obligations.routes.js'
+import { cashRegistersRouter } from './cash-registers.routes.js'
+import { dashboardRouter } from './dashboard.routes.js'
+import { reportsRouter } from './reports.routes.js'
+import { auditRouter } from './audit.routes.js'
+import { notificationsRouter } from './notifications.routes.js'
+import { memberPortalRouter } from './member-portal.routes.js'
+import { portalRouter } from './portal.routes.js'
+import { adminRouter } from './admin.routes.js'
 
 export const apiRouter = Router()
 
 apiRouter.use('/health', healthRouter)
 apiRouter.use('/metrics', metricsRouter)
+
+apiRouter.use('/auth', authRouter)
+apiRouter.use('/users', usersRouter)
+apiRouter.use('/gyms', gymsRouter)
+apiRouter.use('/gym', gymRouter)
+apiRouter.use('/members', membersRouter)
+apiRouter.use('/member-routines', memberRoutinesRouter)
+apiRouter.use('/instructors', instructorsRouter)
+apiRouter.use('/membership-plans', membershipPlansRouter)
+apiRouter.use('/subscriptions', subscriptionsRouter)
+apiRouter.use('/payments', paymentsRouter)
+apiRouter.use('/attendance', attendanceRouter)
+apiRouter.use('/routines', routinesRouter)
+apiRouter.use('/exercises', exercisesRouter)
+apiRouter.use('/financial-obligations', financialObligationsRouter)
+apiRouter.use('/cash-registers', cashRegistersRouter)
+apiRouter.use('/dashboard', dashboardRouter)
+apiRouter.use('/reports', reportsRouter)
+apiRouter.use('/audit', auditRouter)
+apiRouter.use('/notifications', notificationsRouter)
+apiRouter.use('/member-portal', memberPortalRouter)
+apiRouter.use('/portal', portalRouter)
+apiRouter.use('/admin', adminRouter)

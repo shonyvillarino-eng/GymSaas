@@ -1,8 +1,8 @@
 import { createApp } from './app.js';
 import { env } from './config/env.js';
 import { prisma } from './lib/prisma.js';
-import { startNotificationSweep } from './services/notifications.js';
-import { getHealthStatus, getReadiness } from './routes/health/status.js';
+import { startNotificationSweep } from './services/notifications.js';import { checkReadiness } from './lib/readiness.js'
+;
 
 const app = createApp();
 
@@ -59,8 +59,7 @@ const server = app.listen(env.PORT, () => {
   console.log(`   Live:   http://localhost:${env.PORT}/api/v1/health/live`);
   console.log(`   Env:    ${env.NODE_ENV}`);
   if (env.NODE_ENV === 'development') {
-    void getHealthStatus(prisma).then((health) => console.log(JSON.stringify({ health }, null, 2)));
-    void getReadiness(prisma).then((readiness) => console.log(JSON.stringify({ readiness }, null, 2)));
+    void checkReadiness().then((readiness) => console.log(JSON.stringify({ readiness }, null, 2)));
   }
 
 });

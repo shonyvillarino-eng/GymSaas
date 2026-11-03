@@ -1,1 +1,1 @@
-export { checkReadiness } from './readiness.js'
+export { checkReadiness, isLive, isReady } from './readiness.js'

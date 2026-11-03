@@ -1,8 +1,7 @@
 import { Router } from 'express'
 
 import { checkReadiness } from '../lib/health.js'
-import { createLogEntry, error, info } from '../lib/logger.js'
-import { env } from '../config/env.js'
+import { createLogEntry, INFO, ERROR, safeStringify, env } from '../lib/logger.js'
 
 const router = Router()
 
@@ -23,8 +22,17 @@ router.get('/live', (_req, res) => {
   })
 })
 
-router.get('/ready', async (req, res) => {
-  await checkReadiness(req, res)
+router.get('/ready', async (_req, res) => {
+  const ready = await checkReadiness()
+  res.status(ready.ready ? 200 : 503).json({
+    status: ready.ready ? 'ok' : 'error',
+    ready: ready.ready,
+    timestamp: new Date().toISOString(),
+    message: ready.message,
+    database: ready.ready
+      ? { connected: true, latencyMs: ready.latencyMs }
+      : { connected: false, error: ready.error },
+  })
 })
 
 export { router as healthRouter }

@@ -3,6 +3,8 @@ node_modules
 dist
 .env
 .env.local
+.env.*.local
 *.log
+*.pid
+*.pid.lock
 .DS_Store
-```

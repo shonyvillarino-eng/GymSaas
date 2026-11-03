@@ -1,106 +1,83 @@
-export interface MetricEntry {
-  request_id: string | null
+import { Router, type Request as ExpressRequest, type Response, type NextFunction, type Router as ExpressRouter } from 'express'
+
+type Request = ExpressRequest
+
+import { checkReadiness } from '../lib/readiness.js'
+
+export type MetricEntry = {
+  timestamp: number
   method: string
-  path: string
-  status_code: number
-  latency_ms: number
-  is_slow: boolean
-  is_error: boolean
-  timestamp: string
+  route: string
+  status: number
+  duration_ms: number
+  gymId?: string
 }
 
-export interface MetricsSnapshot {
-  requestCount: number
-  errorCount: number
-  slowCount: number
-  latencySumMs: number
-  latencyMinMs: number | null
-  latencyMaxMs: number | null
-  entries: MetricEntry[]
-  truncated: boolean
+export type MetricsSnapshot = {
+  in_flight: number
+  total_requests: number
+  ok: number
+  errors: number
+  by_route: Record<string, { count: number; errors: number; latency_sum_ms: number }>
+  window_start_ms?: number
 }
 
-const maxEntries = 500
-const entries: MetricEntry[] = []
+const store = new Map<string, MetricEntry>()
 
-export function recordMetric(entry: MetricEntry): void {
-  entries.push(entry)
-  if (entries.length > maxEntries) {
-    entries.shift()
-  }
-}
-
-export function getMetrics(): MetricsSnapshot {
-  let requestCount = 0
-  let errorCount = 0
-  let slowCount = 0
-  let latencySum = 0
-  let latencyMin: number | null = null
-  let latencyMax: number | null = null
-
-  for (const e of entries) {
-    requestCount++
-    if (e.isError) errorCount++
-    if (e.isSlow) slowCount++
-    latencySum += e.latency_ms
-    if (latencyMin === null || e.latency_ms < latencyMin) latencyMin = e.latency_ms
-    if (latencyMax === null || e.latency_ms > latencyMax) latencyMax = e.latency_ms
-  }
-
-  return {
-    requestCount,
-    errorCount,
-    slowCount,
-    latencySumMs: latencySum,
-    latencyMinMs: latencyMin,
-    latencyMaxMs: latencyMax,
-    entries: [...entries],
-    truncated: entries.length >= maxEntries,
-  }
-}
-
-export function clearMetrics(): void {
-  entries.length = 0
-}
-
-export function metricsMiddleware(
-  req: import('express').Request,
-  res: import('express').Response,
-  next: import('express').NextFunction,
-): void {
-  const start = performance.now()
-  res.on('finish', () => {
-    const duration = Math.round(performance.now() - start)
-    const slowThreshold = Number(process.env.SLOW_REQUEST_MS ?? 1000)
-    const isSlow = duration >= slowThreshold
-    const statusCode = res.statusCode
-    const isError = statusCode >= 500
-
-    recordMetric({
-      request_id: (req as any).requestId ?? null,
+export function metricsMiddleware(req: Request, res: Response, next: NextFunction) {
+  const start = Date.now()
+  const endSpy = res.end.bind(res)
+  res.end = function (this: Response, chunk?: unknown, encoding?: BufferEncoding) {
+    const duration = Date.now() - start
+    const key = `${req.method} ${req.originalUrl.split('?')[0]}`
+    const entry: MetricEntry = {
+      timestamp: Date.now(),
       method: req.method,
-      path: req.originalUrl.split('?')[0],
-      status_code: statusCode,
-      latency_ms: duration,
-      is_slow: isSlow,
-      is_error: isError,
-      timestamp: new Date().toISOString(),
-    })
-
-    if (isSlow && !isError) {
-      console.warn(
-        JSON.stringify({
-          level: 'warn',
-          event: 'slow_request',
-          request_id: (req as any).requestId ?? null,
-          method: req.method,
-          path: req.originalUrl.split('?')[0],
-          status_code: statusCode,
-          latency_ms: duration,
-        }),
-      )
+      route: key,
+      status: res.statusCode,
+      duration_ms: duration,
+      gymId: (req as Request & { gymId?: string }).gymId,
     }
-  })
-
+    store.set(key, entry)
+    // eslint-disable-next-line prefer-rest-params, @typescript-eslint/no-unsafe-argument
+    return endSpy.call(this, chunk as any, encoding as any)
+  }
   next()
 }
+
+export const metricsRouter = Router()
+export type { ExpressRouter }
+
+metricsRouter.get('/metrics', (_req: Request, res: Response) => {
+  const snapshot: MetricsSnapshot = {
+    in_flight: 0,
+    total_requests: store.size,
+    ok: 0,
+    errors: 0,
+    by_route: {},
+    window_start_ms: Date.now() - 60_000,
+  }
+  for (const entry of store.values()) {
+    if (entry.status >= 400) snapshot.errors++
+    else snapshot.ok++
+    const route = entry.route
+    snapshot.by_route[route] ??= { count: 0, errors: 0, latency_sum_ms: 0 }
+    snapshot.by_route[route].count++
+    snapshot.by_route[route].latency_sum_ms += entry.duration_ms
+    if (entry.status >= 400) snapshot.by_route[route].errors++
+  }
+  res.json(snapshot)
+})
+
+metricsRouter.get('/health', async (_req: Request, res: Response) => {
+  const ready = await checkReadiness()
+  res.json({
+    status: ready.ready ? 'ok' : 'error',
+    ready: ready.ready,
+    timestamp: new Date().toISOString(),
+    message: ready.message,
+    database: ready.ready
+      ? { connected: true, latencyMs: ready.latencyMs }
+      : { connected: false, error: ready.error },
+  })
+})

@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import { createApp } from '../src/app.js'
 import { env } from '../src/config/env.js'
 import { prisma } from '../src/lib/prisma.js'
@@ -12,6 +13,8 @@ const server = app.listen(env.PORT, async () => {
     console.log(JSON.stringify({ health, readiness }, null, 2))
   } catch (error) {
     console.error(error)
+    server.close()
+    await prisma.$disconnect()
     process.exit(1)
   } finally {
     server.close()

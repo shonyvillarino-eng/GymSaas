@@ -1,0 +1,13 @@
+packages/misc
+
+pids
+statuspush
+
+dist
+.env
+.env.local
+.env.*.local
+*.log
+*.pid
+*.pid.lock
+.DS_Store
